@@ -1,4 +1,3 @@
-import React from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
@@ -6,7 +5,7 @@ import { LogOut, Home, Settings, Users, FileText, UserCircle } from 'lucide-reac
 import '../index.css';
 
 export function Layout() {
-  const { user, role, loading } = useAuth();
+  const { role, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 

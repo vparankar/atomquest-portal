@@ -1,5 +1,3 @@
-import React from 'react';
-
 export function ManagerDashboard() {
   return (
     <div className="dashboard-container">
