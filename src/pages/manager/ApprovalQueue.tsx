@@ -33,7 +33,7 @@ export function ApprovalQueue() {
         .from('goal_sheets')
         .select(`
           *,
-          profiles!inner(*),
+          profiles!goal_sheets_employee_id_fkey!inner(*),
           goals(*)
         `)
         .eq('status', statusFilter)
