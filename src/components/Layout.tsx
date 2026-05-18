@@ -81,7 +81,12 @@ export function Layout() {
         <nav className="sidebar-nav">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname.startsWith(item.path);
+            // Root paths (e.g., /admin, /employee, /manager) need exact match
+            // to avoid staying highlighted on sub-routes
+            const isRootPath = item.path === '/admin' || item.path === '/employee' || item.path === '/manager';
+            const isActive = isRootPath
+              ? location.pathname === item.path
+              : location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}

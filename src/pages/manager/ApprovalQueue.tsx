@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { GoalSheet, Goal, Profile } from '../../types';
-import { Check, X, AlertCircle, MessageSquare } from 'lucide-react';
+import { Check, X, MessageSquare } from 'lucide-react';
+import { Spinner } from '../../components/Spinner';
+import { useToast } from '../../components/Toast';
 
 interface GoalSheetWithRelations extends GoalSheet {
   profiles: Profile;
@@ -14,7 +16,7 @@ export function ApprovalQueue() {
   const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
   const [sheets, setSheets] = useState<GoalSheetWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Rework Modal State
   const [reworkSheetId, setReworkSheetId] = useState<string | null>(null);
@@ -26,7 +28,6 @@ export function ApprovalQueue() {
   const fetchSheets = async () => {
     if (!user) return;
     setLoading(true);
-    setError(null);
     try {
       const statusFilter = activeTab === 'pending' ? 'submitted' : 'approved';
       const { data, error: fetchErr } = await supabase
@@ -45,7 +46,7 @@ export function ApprovalQueue() {
       setSheets((data as any) || []);
     } catch (err: any) {
       console.error(err);
-      setError('Failed to fetch approval queue.');
+      toast.error('Failed to fetch approval queue.');
     } finally {
       setLoading(false);
     }
@@ -83,12 +84,11 @@ export function ApprovalQueue() {
   const handleApprove = async (sheet: GoalSheetWithRelations) => {
     const validationError = validateSheet(sheet);
     if (validationError) {
-      setError(validationError);
+      toast.error(validationError);
       return;
     }
 
     setSavingId(sheet.id);
-    setError(null);
     try {
       // First update all goals that might have been changed
       for (const goal of sheet.goals) {
@@ -125,9 +125,10 @@ export function ApprovalQueue() {
 
       // Remove from list
       setSheets(sheets.filter(s => s.id !== sheet.id));
+      toast.success('Sheet approved successfully');
     } catch (err: any) {
       console.error(err);
-      setError('Failed to approve sheet.');
+      toast.error('Failed to approve sheet.');
     } finally {
       setSavingId(null);
     }
@@ -136,12 +137,11 @@ export function ApprovalQueue() {
   const handleReworkSubmit = async () => {
     if (!reworkSheetId) return;
     if (!reworkComment.trim()) {
-      setError("Please provide a comment for rework.");
+      toast.error("Please provide a comment for rework.");
       return;
     }
 
     setSavingId(reworkSheetId);
-    setError(null);
     try {
       const { error: sheetErr } = await supabase
         .from('goal_sheets')
@@ -166,16 +166,17 @@ export function ApprovalQueue() {
       setSheets(sheets.filter(s => s.id !== reworkSheetId));
       setReworkSheetId(null);
       setReworkComment('');
+      toast.success('Sheet returned for rework');
     } catch (err: any) {
       console.error(err);
-      setError('Failed to return for rework.');
+      toast.error('Failed to return for rework.');
     } finally {
       setSavingId(null);
     }
   };
 
   if (loading && sheets.length === 0) {
-    return <div className="p-8 text-center text-slate-500">Loading queue...</div>;
+    return <div className="p-8"><Spinner /></div>;
   }
 
   return (
@@ -198,13 +199,6 @@ export function ApprovalQueue() {
         </div>
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-center text-red-700">
-          <AlertCircle size={18} className="mr-2 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
       <div className="space-y-6">
         {sheets.length === 0 && !loading && (
           <div className="text-center p-12 bg-slate-50 border border-dashed border-slate-300 rounded-md">
@@ -220,24 +214,24 @@ export function ApprovalQueue() {
 
           return (
             <div key={sheet.id} className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-              <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+              <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">{sheet.profiles.full_name || 'Unknown Employee'}</h3>
-                  <p className="text-sm text-slate-500">Submitted on {new Date(sheet.updated_at || sheet.created_at || '').toLocaleDateString()}</p>
+                  <p className="text-sm text-slate-500">Submitted on {new Date(sheet.created_at || '').toLocaleDateString()}</p>
                 </div>
                 {isPending && (
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 w-full sm:w-auto">
                     <button
                       onClick={() => setReworkSheetId(sheet.id)}
                       disabled={savingId === sheet.id}
-                      className="px-4 py-2 border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50"
+                      className="flex-1 sm:flex-none px-4 py-2 border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50"
                     >
                       Return for Rework
                     </button>
                     <button
                       onClick={() => handleApprove(sheet)}
                       disabled={savingId === sheet.id || totalWeightage !== 100}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50"
+                      className="flex-1 sm:flex-none justify-center items-center px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50"
                     >
                       {savingId === sheet.id ? 'Saving...' : 'Approve'}
                     </button>

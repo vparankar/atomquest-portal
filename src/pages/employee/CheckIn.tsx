@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { Cycle, Goal } from '../../types';
-import { AlertCircle, Save, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, Save } from 'lucide-react';
+import { Spinner } from '../../components/Spinner';
+import { useToast } from '../../components/Toast';
 
 interface GoalWithCheckIn extends Goal {
   achievement_id?: string;
@@ -20,7 +22,7 @@ export function CheckIn() {
   const [goals, setGoals] = useState<GoalWithCheckIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!user) return;
@@ -101,7 +103,7 @@ export function CheckIn() {
       }
     } catch (err: any) {
       console.error(err);
-      setMessage({ type: 'error', text: 'Failed to load data' });
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -150,7 +152,6 @@ export function CheckIn() {
   const handleSave = async () => {
     if (!activeCycle) return;
     setSaving(true);
-    setMessage(null);
 
     try {
       const achievementsToUpsert = goals.map(g => {
@@ -204,23 +205,18 @@ export function CheckIn() {
       });
       setGoals(updatedGoals);
 
-      setMessage({ type: 'success', text: 'Check-in saved successfully!' });
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setMessage(null);
-      }, 3000);
+      toast.success('Check-in saved successfully!');
 
     } catch (err: any) {
       console.error(err);
-      setMessage({ type: 'error', text: err.message || 'An error occurred while saving.' });
+      toast.error(err.message || 'An error occurred while saving.');
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500">Loading...</div>;
+    return <div className="p-8"><Spinner /></div>;
   }
 
   if (!activeCycle) {
@@ -263,13 +259,6 @@ export function CheckIn() {
           <p className="text-slate-500 mt-1">Cycle: {activeCycle.year} - {activeCycle.phase.toUpperCase()}</p>
         </div>
       </div>
-
-      {message && (
-        <div className={`mb-6 p-4 rounded-md flex items-center ${message.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
-          {message.type === 'success' ? <CheckCircle2 size={18} className="mr-2" /> : <AlertCircle size={18} className="mr-2" />}
-          <span>{message.text}</span>
-        </div>
-      )}
 
       <div className="space-y-6">
         {goals.map((goal, index) => (

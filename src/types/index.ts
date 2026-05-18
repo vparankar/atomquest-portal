@@ -1,12 +1,10 @@
 export interface Profile {
   id: string;
-  email?: string;
   full_name?: string;
   role: 'employee' | 'manager' | 'admin';
   manager_id?: string;
   department?: string;
   created_at?: string;
-  updated_at?: string;
 }
 
 export interface Goal {
@@ -35,7 +33,6 @@ export interface GoalSheet {
   approved_at?: string;
   approved_by?: string;
   created_at?: string;
-  updated_at?: string;
   profiles?: Profile;
   goals?: Goal[];
 }

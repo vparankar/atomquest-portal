@@ -5,13 +5,15 @@ import { Layout } from './components/Layout';
 import { EmployeeDashboard } from './pages/employee';
 import { ManagerDashboard } from './pages/manager';
 import { AdminDashboard } from './pages/admin';
+import { ToastProvider } from './components/Toast';
 import './index.css';
 
 function App() {
   return (
-    <AuthProvider>
-    <Router>
-      <Routes>
+    <ToastProvider>
+      <AuthProvider>
+      <Router>
+        <Routes>
         <Route path="/" element={<Login />} />
         
         {/* Protected Routes wrapped in Layout */}
@@ -26,6 +28,7 @@ function App() {
       </Routes>
     </Router>
     </AuthProvider>
+    </ToastProvider>
   );
 }
 

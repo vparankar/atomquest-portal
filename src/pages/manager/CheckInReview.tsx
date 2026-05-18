@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { Cycle, Profile, Goal, Achievement } from '../../types';
-import { ChevronDown, ChevronUp, Save, MessageSquare } from 'lucide-react';
+import { ChevronDown, ChevronUp, Save, MessageSquare, Users } from 'lucide-react';
+import { Spinner } from '../../components/Spinner';
+import { useToast } from '../../components/Toast';
 
 interface TeamMemberCheckIn extends Profile {
   goals: (Goal & { achievement?: Achievement })[];
@@ -15,6 +17,7 @@ export function CheckInReview() {
   const [teamCheckIns, setTeamCheckIns] = useState<TeamMemberCheckIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Local state for manager comments to avoid full re-renders on typing
   const [comments, setComments] = useState<Record<string, string>>({});
@@ -116,8 +119,9 @@ export function CheckInReview() {
         setComments(initialComments);
         setTeamCheckIns(mergedTeamData);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      toast.error(err.message || 'Failed to load team check-ins');
     } finally {
       setLoading(false);
     }
@@ -156,15 +160,16 @@ export function CheckInReview() {
         })
       })));
 
-    } catch (err) {
+      toast.success('Comment saved successfully');
+    } catch (err: any) {
       console.error('Failed to save comment', err);
-      alert('Failed to save comment');
+      toast.error('Failed to save comment');
     } finally {
       setSavingId(null);
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Loading team check-ins...</div>;
+  if (loading) return <div className="p-8"><Spinner /></div>;
 
   if (!activeCycle) return <div className="p-8 text-center text-red-500">No active cycle found.</div>;
 
@@ -175,8 +180,8 @@ export function CheckInReview() {
         <p className="text-slate-500 mt-1">Cycle: {activeCycle.year} - {activeCycle.phase.toUpperCase()}</p>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-md shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm">
+      <div className="bg-white border border-slate-200 rounded-md shadow-sm overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
             <tr>
               <th className="px-6 py-4 font-medium">Employee</th>
@@ -303,8 +308,10 @@ export function CheckInReview() {
 
             {teamCheckIns.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                  No team members found.
+                <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                  <Users className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+                  <p className="text-sm font-medium text-slate-900">No team members found</p>
+                  <p className="text-xs text-slate-500 mt-1">There are no team members assigned to you.</p>
                 </td>
               </tr>
             )}

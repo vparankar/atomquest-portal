@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
-import { Download, CheckCircle2, XCircle, Loader2, BarChart3, ClipboardCheck } from 'lucide-react';
+import { Download, CheckCircle2, XCircle, BarChart3, ClipboardCheck } from 'lucide-react';
+import { Spinner } from '../../components/Spinner';
+import { useToast } from '../../components/Toast';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -82,6 +84,7 @@ export function Reports() {
 function AchievementReport() {
   const [rows, setRows] = useState<AchievementRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchData();
@@ -104,6 +107,7 @@ function AchievementReport() {
 
     if (error) {
       console.error('Achievement fetch error:', error);
+      toast.error('Achievement fetch error: ' + error.message);
       setLoading(false);
       return;
     }
@@ -184,6 +188,7 @@ function AchievementReport() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Achievement Report');
     XLSX.writeFile(wb, 'achievement_report.xlsx');
+    toast.success('Report exported successfully');
   };
 
   const columns = [
@@ -195,8 +200,7 @@ function AchievementReport() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400 gap-3">
-        <Loader2 className="animate-spin" size={20} />
-        Loading achievement data…
+        <Spinner />
       </div>
     );
   }
@@ -296,6 +300,7 @@ function CompletionDashboard() {
   const [completionRows, setCompletionRows] = useState<CompletionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPhase, setCurrentPhase] = useState('');
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchCompletion();
@@ -316,13 +321,18 @@ function CompletionDashboard() {
     }
 
     // All employees
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profErr } = await supabase
       .from('profiles')
       .select('id, full_name, department')
       .in('role', ['employee', 'manager']);
 
+    if (profErr) {
+      console.error(profErr);
+      toast.error('Failed to load profiles: ' + profErr.message);
+    }
+
     // All goal_sheets with goals + achievements
-    const { data: sheets } = await supabase
+    const { data: sheets, error: sheetsErr } = await supabase
       .from('goal_sheets')
       .select(`
         id, employee_id, status,
@@ -331,6 +341,11 @@ function CompletionDashboard() {
           achievements ( cycle_phase, actual_value, status )
         )
       `);
+
+    if (sheetsErr) {
+      console.error(sheetsErr);
+      toast.error('Failed to load goal sheets: ' + sheetsErr.message);
+    }
 
     const sheetsByEmp: Record<string, any> = {};
     for (const s of (sheets || []) as any[]) {
@@ -383,8 +398,7 @@ function CompletionDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-400 gap-3">
-        <Loader2 className="animate-spin" size={20} />
-        Loading completion data…
+        <Spinner />
       </div>
     );
   }

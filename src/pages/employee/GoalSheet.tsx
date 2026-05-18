@@ -3,6 +3,8 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { GoalSheet as GoalSheetType, Goal, Cycle } from '../../types';
 import { Lock, Plus, Trash2, AlertCircle, Info } from 'lucide-react';
+import { Spinner } from '../../components/Spinner';
+import { useToast } from '../../components/Toast';
 
 const THRUST_AREAS = ["Revenue", "Cost", "Customer", "People", "Process", "Quality"];
 const UOM_TYPES = [
@@ -20,7 +22,7 @@ export function GoalSheet() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!user) return;
@@ -67,7 +69,7 @@ export function GoalSheet() {
         }
       } catch (err: any) {
         console.error(err);
-        setError('Failed to load goal sheet data');
+        toast.error(err.message || 'Failed to load goal sheet data');
       } finally {
         setLoading(false);
       }
@@ -99,7 +101,19 @@ export function GoalSheet() {
 
   const updateGoal = (index: number, field: keyof Goal, value: any) => {
     const updated = [...goals];
-    updated[index] = { ...updated[index], [field]: value };
+    
+    if (field === 'weightage') {
+      const parsedValue = value === '' ? undefined : Number(value);
+      const currentTotalWithoutThisGoal = goals.reduce((sum, g, i) => i !== index ? sum + (Number(g.weightage) || 0) : sum, 0);
+      if (parsedValue !== undefined && currentTotalWithoutThisGoal + parsedValue > 100) {
+        toast.error(`Weightage cannot exceed remaining available (${100 - currentTotalWithoutThisGoal}%)`);
+        return;
+      }
+      updated[index] = { ...updated[index], [field]: parsedValue };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
+
     // Clear the other target field based on uom
     if (field === 'uom_type') {
       if (value === 'timeline') {
@@ -133,10 +147,9 @@ export function GoalSheet() {
   const handleSubmit = async () => {
     const validationError = validate();
     if (validationError) {
-      setError(validationError);
+      toast.error(validationError);
       return;
     }
-    setError(null);
     setSaving(true);
 
     try {
@@ -149,7 +162,8 @@ export function GoalSheet() {
           .insert({
             employee_id: user!.id,
             cycle_id: activeCycle!.id,
-            status: 'submitted'
+            status: 'submitted',
+            submitted_at: new Date().toISOString()
           })
           .select()
           .single();
@@ -196,21 +210,23 @@ export function GoalSheet() {
 
       // Audit log
       await supabase.from('audit_logs').insert({
-        employee_id: user!.id,
+        entity_type: 'goal_sheet',
+        entity_id: currentSheetId,
         action: 'SUBMIT_GOAL_SHEET',
-        details: { sheet_id: currentSheetId, num_goals: goals.length }
+        changed_by: user!.id,
+        new_value: { num_goals: goals.length }
       });
 
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'An error occurred while saving.');
+      toast.error(err.message || 'An error occurred while saving.');
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500">Loading goal sheet...</div>;
+    return <div className="p-8"><Spinner /></div>;
   }
 
   if (!activeCycle) {
@@ -249,14 +265,20 @@ export function GoalSheet() {
         </div>
       )}
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md flex items-center text-red-700">
-          <AlertCircle size={18} className="mr-2 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
       <div className="space-y-6">
+        {goals.length === 0 && (
+          <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
+            <p className="text-slate-500">No goals yet.</p>
+            {!isReadOnly && (
+              <button
+                onClick={addGoal}
+                className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
+              >
+                + Add your first goal
+              </button>
+            )}
+          </div>
+        )}
         {goals.map((goal, index) => (
           <div key={index} className="bg-white border border-slate-200 rounded-md p-6 shadow-sm">
             <div className="flex justify-between items-start mb-4">
@@ -293,8 +315,8 @@ export function GoalSheet() {
                   type="number"
                   disabled={isReadOnly}
                   value={goal.weightage || ''}
-                  onChange={e => updateGoal(index, 'weightage', parseInt(e.target.value) || 0)}
-                  min={10} max={90}
+                  onChange={e => updateGoal(index, 'weightage', e.target.value)}
+                  min={10} max={100}
                   className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
                 />
               </div>
@@ -384,9 +406,9 @@ export function GoalSheet() {
             <div className="text-right">
               <span className="text-sm text-slate-500 mr-2">Total Weightage:</span>
               <span className={`text-lg font-semibold ${totalWeightage > 100 ? 'text-red-600' :
-                totalWeightage === 100 ? 'text-green-600' : 'text-slate-700'
+                totalWeightage === 100 ? 'text-green-600' : 'text-amber-600'
                 }`}>
-                {totalWeightage}%
+                {totalWeightage}/100%
               </span>
             </div>
 

@@ -4,6 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
+import { Spinner } from '../../components/Spinner';
+import { useToast } from '../../components/Toast';
 
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
@@ -18,6 +20,7 @@ interface AnalyticsData {
 export function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchData();
@@ -145,8 +148,9 @@ export function Analytics() {
 
       setData({ qoqTrend, goalDistribution, heatmap, managerEffectiveness });
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching analytics data:', err);
+      toast.error('Failed to load analytics: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -163,6 +167,7 @@ export function Analytics() {
     return (
       <div className="p-8 space-y-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-8 animate-pulse bg-gray-200 h-8 w-64 rounded"></h1>
+        <div className="flex justify-center py-20"><Spinner /></div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="h-96 bg-gray-200 rounded-xl animate-pulse"></div>
           <div className="h-96 bg-gray-200 rounded-xl animate-pulse"></div>
@@ -189,7 +194,7 @@ export function Analytics() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">QoQ Achievement Trend</h2>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
               <BarChart data={data.qoqTrend} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} />
@@ -211,7 +216,7 @@ export function Analytics() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">Goal Distribution by Thrust Area</h2>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
               <PieChart>
                 <Pie
                   data={data.goalDistribution}
@@ -292,7 +297,7 @@ export function Analytics() {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">Manager Effectiveness (% Check-ins Completed)</h2>
           <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
               <BarChart
                 layout="vertical"
                 data={data.managerEffectiveness}
