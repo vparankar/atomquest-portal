@@ -8,26 +8,33 @@ export interface Profile {
 
 export interface Goal {
   id: string;
-  user_id: string;
+  sheet_id?: string;
+  thrust_area: string;
   title: string;
   description?: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  uom_type?: 'min' | 'max' | 'timeline' | 'zero';
+  target_value?: number;
+  target_date?: string;
+  weightage?: number;
+  status: 'not_started' | 'on_track' | 'completed';
+  is_shared?: boolean;
+  shared_from?: string;
   created_at?: string;
-  updated_at?: string;
 }
 
 export interface GoalSheet {
   id: string;
-  user_id: string;
+  employee_id: string;
   cycle_id: string;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'rework';
+  manager_comment?: string;
   created_at?: string;
   updated_at?: string;
 }
 
 export interface Achievement {
   id: string;
-  user_id: string;
+  employee_id: string;
   title: string;
   description?: string;
   date_earned: string;
@@ -45,7 +52,7 @@ export interface Cycle {
 
 export interface AuditLog {
   id: string;
-  user_id: string;
+  employee_id: string;
   action: string;
   details?: Record<string, any>;
   created_at?: string;
