@@ -183,6 +183,17 @@ export function CheckIn() {
 
       if (error) throw error;
 
+      // Update the status in the goals table for each goal to stay in sync
+      const goalUpdates = goals.map(g =>
+        supabase
+          .from('goals')
+          .update({ status: g.checkin_status })
+          .eq('id', g.id)
+      );
+      const updateResults = await Promise.all(goalUpdates);
+      const updateError = updateResults.find(r => r.error)?.error;
+      if (updateError) throw updateError;
+
       // Update local state with newly created IDs if any
       const updatedGoals = goals.map(g => {
         const matchingAch = data?.find(a => a.goal_id === g.id);
