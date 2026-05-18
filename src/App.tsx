@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './hooks/AuthContext';
 import { Login } from './pages/Login';
 import { Layout } from './components/Layout';
 import { EmployeeDashboard } from './pages/employee';
@@ -8,6 +9,7 @@ import './index.css';
 
 function App() {
   return (
+    <AuthProvider>
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
@@ -23,6 +25,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </AuthProvider>
   );
 }
 
