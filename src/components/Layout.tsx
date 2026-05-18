@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { LogOut, Home, Settings, Users, FileText, UserCircle, Loader2, BarChart3 } from 'lucide-react';
+import { LogOut, Home, Settings, Users, FileText, UserCircle, Loader2, BarChart3, PieChart } from 'lucide-react';
 import '../index.css';
 
 const DEMO_CREDENTIALS = {
@@ -51,6 +51,7 @@ export function Layout() {
   if (role === 'admin') {
     navItems = [
       { name: 'Admin Dashboard', path: '/admin', icon: Home },
+      { name: 'Analytics', path: '/admin/analytics', icon: PieChart },
       { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
       { name: 'Manage Users', path: '/admin/users', icon: Users },
       { name: 'Settings', path: '/admin/settings', icon: Settings },
