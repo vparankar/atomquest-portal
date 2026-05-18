@@ -222,7 +222,7 @@ export function GoalSheet() {
       <div className="mb-8 flex justify-between items-center border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">My Goals</h1>
-          <p className="text-slate-500 mt-1">Cycle: {activeCycle.name}</p>
+          <p className="text-slate-500 mt-1">Cycle: {activeCycle.year} - {activeCycle.phase.toUpperCase()}</p>
         </div>
 
         {goalSheet && (

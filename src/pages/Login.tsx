@@ -23,8 +23,23 @@ export function Login() {
 
       if (error) throw error;
 
-      const demoRole = localStorage.getItem('demo_role') || 'employee';
-      navigate(`/${demoRole}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (profile) {
+          navigate(`/${profile.role}`);
+        } else {
+          navigate('/employee');
+        }
+      } else {
+        navigate('/employee');
+      }
       
     } catch (err: any) {
       setError(err.message || 'Failed to login');

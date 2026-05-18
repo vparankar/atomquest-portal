@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { GoalSheet } from './GoalSheet';
+import { CheckIn } from './CheckIn';
 
 export function EmployeeDashboard() {
   return (
@@ -11,6 +12,7 @@ export function EmployeeDashboard() {
         </div>
       } />
       <Route path="goals" element={<GoalSheet />} />
+      <Route path="checkin" element={<CheckIn />} />
     </Routes>
   );
 }

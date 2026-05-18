@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { ApprovalQueue } from './ApprovalQueue';
+import { CheckInReview } from './CheckInReview';
 
 function DashboardHome() {
   return (
@@ -14,7 +15,8 @@ export function ManagerDashboard() {
   return (
     <Routes>
       <Route path="/" element={<DashboardHome />} />
-      <Route path="/team" element={<ApprovalQueue />} />
+      <Route path="team" element={<ApprovalQueue />} />
+      <Route path="reviews" element={<CheckInReview />} />
     </Routes>
   );
 }

@@ -1,30 +1,53 @@
+import { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { LogOut, Home, Settings, Users, FileText, UserCircle } from 'lucide-react';
+import { LogOut, Home, Settings, Users, FileText, UserCircle, Loader2 } from 'lucide-react';
 import '../index.css';
+
+const DEMO_CREDENTIALS = {
+  employee: { email: 'employee@test.com', password: 'employee' },
+  manager: { email: 'manager@test.com', password: 'manager' },
+  admin: { email: 'admin@test.com', password: 'admin' },
+};
+
+const ROLE_HOME = {
+  employee: '/employee',
+  manager: '/manager',
+  admin: '/admin',
+};
 
 export function Layout() {
   const { role, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [switching, setSwitching] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/');
   };
 
-  const switchRole = (newRole: 'employee' | 'manager' | 'admin') => {
-    localStorage.setItem('demo_role', newRole);
-    window.dispatchEvent(new Event('demo_role_change'));
-    navigate(`/${newRole}`);
+  // ✅ Actually signs in as the demo user for that role
+  const switchRole = async (newRole: 'employee' | 'manager' | 'admin') => {
+    if (switching || newRole === role) return;
+    setSwitching(true);
+    const { error } = await supabase.auth.signInWithPassword(DEMO_CREDENTIALS[newRole]);
+    if (error) {
+      alert(`Could not switch to ${newRole}: ${error.message}`);
+      setSwitching(false);
+      return;
+    }
+    // useAuth() will pick up the new session automatically
+    navigate(ROLE_HOME[newRole]);
+    setSwitching(false);
   };
 
   if (loading) {
     return <div className="loading-screen">Loading...</div>;
   }
 
-  let navItems = [];
+  let navItems: { name: string; path: string; icon: any }[] = [];
   if (role === 'admin') {
     navItems = [
       { name: 'Admin Dashboard', path: '/admin', icon: Home },
@@ -41,18 +64,18 @@ export function Layout() {
     navItems = [
       { name: 'My Dashboard', path: '/employee', icon: Home },
       { name: 'My Goals', path: '/employee/goals', icon: FileText },
+      { name: 'Check-In', path: '/employee/checkin', icon: FileText },
       { name: 'Profile', path: '/employee/profile', icon: UserCircle },
     ];
   }
 
   return (
     <div className="layout-container">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <h1 className="brand-title">AtomQuest</h1>
         </div>
-        
+
         <nav className="sidebar-nav">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -71,42 +94,32 @@ export function Layout() {
         </nav>
 
         <div className="sidebar-footer">
-          {/* Demo Role Switcher */}
           <div className="demo-switcher">
-            <p className="demo-title">Demo: Switch Role</p>
+            <p className="demo-title">
+              Demo: Switch Role
+              {switching && <Loader2 size={12} className="inline ml-2 animate-spin" />}
+            </p>
             <div className="demo-buttons">
-              <button 
-                onClick={() => switchRole('employee')}
-                className={`demo-btn ${role === 'employee' ? 'demo-btn-active' : ''}`}
-              >
-                Employee
-              </button>
-              <button 
-                onClick={() => switchRole('manager')}
-                className={`demo-btn ${role === 'manager' ? 'demo-btn-active' : ''}`}
-              >
-                Manager
-              </button>
-              <button 
-                onClick={() => switchRole('admin')}
-                className={`demo-btn ${role === 'admin' ? 'demo-btn-active' : ''}`}
-              >
-                Admin
-              </button>
+              {(['employee', 'manager', 'admin'] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => switchRole(r)}
+                  disabled={switching || r === role}
+                  className={`demo-btn ${role === r ? 'demo-btn-active' : ''}`}
+                >
+                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                </button>
+              ))}
             </div>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="logout-btn"
-          >
+          <button onClick={handleLogout} className="logout-btn">
             <LogOut size={20} />
             <span>Logout</span>
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="main-content">
         <Outlet />
       </main>

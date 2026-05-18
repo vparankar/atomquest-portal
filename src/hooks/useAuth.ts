@@ -6,14 +6,17 @@ import type { Profile } from '../types';
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [role, setRole] = useState<Profile['role'] | null>(
-    (localStorage.getItem('demo_role') as Profile['role']) || null
-  );
+  const [role, setRole] = useState<Profile['role'] | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!mounted) return;
+      
       setUser(session?.user || null);
       
       if (session?.user) {
@@ -23,19 +26,26 @@ export function useAuth() {
           .eq('id', session.user.id)
           .single();
         
-        if (data) {
-          setProfile(data);
-          if (!localStorage.getItem('demo_role')) {
+        if (mounted) {
+          if (data) {
+            setProfile(data);
             setRole(data.role);
           }
         }
+      } else {
+        if (mounted) {
+          setProfile(null);
+          setRole(null);
+        }
       }
-      setLoading(false);
+      if (mounted) setLoading(false);
     };
 
     fetchSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      
       setUser(session?.user || null);
       if (session?.user) {
         const { data } = await supabase
@@ -44,39 +54,26 @@ export function useAuth() {
           .eq('id', session.user.id)
           .single();
           
-        if (data) {
-          setProfile(data);
-          if (!localStorage.getItem('demo_role')) {
+        if (mounted) {
+          if (data) {
+            setProfile(data);
             setRole(data.role);
           }
         }
       } else {
-        setProfile(null);
-        if (!localStorage.getItem('demo_role')) {
-           setRole(null);
+        if (mounted) {
+          setProfile(null);
+          setRole(null);
         }
       }
-      setLoading(false);
+      if (mounted) setLoading(false);
     });
 
-    const handleStorageChange = () => {
-      const demoRole = localStorage.getItem('demo_role') as Profile['role'] | null;
-      if (demoRole) {
-        setRole(demoRole);
-      } else if (profile) {
-        setRole(profile.role);
-      } else {
-        setRole(null);
-      }
-    };
-
-    window.addEventListener('demo_role_change', handleStorageChange);
-
     return () => {
+      mounted = false;
       subscription.unsubscribe();
-      window.removeEventListener('demo_role_change', handleStorageChange);
     };
-  }, [profile]);
+  }, []);
 
   return { user, profile, role, loading };
 }

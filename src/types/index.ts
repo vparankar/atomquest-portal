@@ -42,18 +42,23 @@ export interface GoalSheet {
 
 export interface Achievement {
   id: string;
-  employee_id: string;
-  title: string;
-  description?: string;
-  date_earned: string;
-  created_at?: string;
+  goal_id: string;
+  cycle_phase: 'q1' | 'q2' | 'q3' | 'q4';
+  actual_value?: number;
+  actual_date?: string;
+  status: 'not_started' | 'on_track' | 'completed';
+  score?: number;
+  manager_comment?: string;
+  logged_at?: string;
+  goal?: Goal;
 }
 
 export interface Cycle {
   id: string;
-  name: string;
-  start_date: string;
-  end_date: string;
+  year: number;
+  phase: 'goal_setting' | 'q1' | 'q2' | 'q3' | 'q4';
+  opens_at: string;
+  closes_at: string;
   is_active: boolean;
   created_at?: string;
 }

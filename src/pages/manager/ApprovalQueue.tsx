@@ -33,10 +33,11 @@ export function ApprovalQueue() {
         .from('goal_sheets')
         .select(`
           *,
-          profiles!goal_sheets_employee_id_fkey(*),
+          profiles!inner(*),
           goals(*)
         `)
         .eq('status', statusFilter)
+        .eq('profiles.manager_id', user.id)
         .order('created_at', { ascending: false });
 
       if (fetchErr) throw fetchErr;
