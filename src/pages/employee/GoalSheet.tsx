@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { GoalSheet as GoalSheetType, Goal, Cycle } from '../../types';
@@ -43,7 +43,7 @@ export function GoalSheet() {
           const { data: sheetData, error: sheetError } = await supabase
             .from('goal_sheets')
             .select('*')
-            .eq('employee_id', user.id)
+            .eq('employee_id', user!.id)
             .eq('cycle_id', cycleData.id)
             .maybeSingle();
 
