@@ -302,81 +302,81 @@ export function GoalSheet() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
               {/* Thrust Area */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Thrust Area</label>
+              <div className="md:col-span-8">
+                <label className="form-label">Thrust Area</label>
                 <select
                   disabled={isReadOnly}
                   value={goal.thrust_area || ''}
                   onChange={e => updateGoal(index, 'thrust_area', e.target.value)}
-                  className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                  className="form-select disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   {THRUST_AREAS.map(ta => <option key={ta} value={ta}>{ta}</option>)}
                 </select>
               </div>
 
               {/* Weightage */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Weightage (%)</label>
+              <div className="md:col-span-4">
+                <label className="form-label">Weightage (%)</label>
                 <input
                   type="number"
                   disabled={isReadOnly}
                   value={goal.weightage || ''}
                   onChange={e => updateGoal(index, 'weightage', e.target.value)}
                   min={10} max={100}
-                  className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                  className="form-input disabled:bg-slate-50 disabled:text-slate-500"
                 />
               </div>
 
               {/* Title */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Goal Title</label>
+              <div className="md:col-span-12">
+                <label className="form-label">Goal Title</label>
                 <input
                   type="text"
                   disabled={isReadOnly}
                   value={goal.title || ''}
                   onChange={e => updateGoal(index, 'title', e.target.value)}
-                  className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                  className="form-input disabled:bg-slate-50 disabled:text-slate-500"
                   placeholder="E.g., Increase Q3 Sales Revenue"
                 />
               </div>
 
               {/* Description */}
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
+              <div className="md:col-span-12">
+                <label className="form-label">Description (Optional)</label>
                 <textarea
                   disabled={isReadOnly}
                   value={goal.description || ''}
                   onChange={e => updateGoal(index, 'description', e.target.value)}
                   rows={2}
-                  className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                  className="form-textarea disabled:bg-slate-50 disabled:text-slate-500"
                 />
               </div>
 
               {/* UoM Type */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Unit of Measurement</label>
+              <div className="md:col-span-8">
+                <label className="form-label">Unit of Measurement</label>
                 <select
                   disabled={isReadOnly}
                   value={goal.uom_type || 'min'}
                   onChange={e => updateGoal(index, 'uom_type', e.target.value)}
-                  className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                  className="form-select disabled:bg-slate-50 disabled:text-slate-500"
                 >
                   {UOM_TYPES.map(uom => <option key={uom.value} value={uom.value}>{uom.label}</option>)}
                 </select>
               </div>
 
               {/* Target Value/Date */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Target</label>
+              <div className="md:col-span-4">
+                <label className="form-label">Target</label>
                 {goal.uom_type === 'timeline' ? (
                   <input
                     type="date"
                     disabled={isReadOnly}
                     value={goal.target_date || ''}
                     onChange={e => updateGoal(index, 'target_date', e.target.value)}
-                    className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                    className="form-input disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 ) : (
                   <input
@@ -384,7 +384,7 @@ export function GoalSheet() {
                     disabled={isReadOnly}
                     value={goal.target_value !== undefined ? goal.target_value : ''}
                     onChange={e => updateGoal(index, 'target_value', parseFloat(e.target.value))}
-                    className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                    className="form-input disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 )}
               </div>

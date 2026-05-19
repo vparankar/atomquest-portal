@@ -280,7 +280,7 @@ export function CheckIn() {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">
+                <label className="form-label">
                   Actual {goal.uom_type === 'timeline' ? 'Date' : 'Value'}
                 </label>
                 {goal.uom_type === 'timeline' ? (
@@ -288,24 +288,24 @@ export function CheckIn() {
                     type="date"
                     value={goal.actual_date || ''}
                     onChange={e => handleChange(index, 'actual_date', e.target.value)}
-                    className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="form-input"
                   />
                 ) : (
                   <input
                     type="number"
                     value={goal.actual_value || ''}
                     onChange={e => handleChange(index, 'actual_value', e.target.value)}
-                    className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="form-input"
                   />
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                <label className="form-label">Status</label>
                 <select
                   value={goal.checkin_status}
                   onChange={e => handleChange(index, 'checkin_status', e.target.value)}
-                  className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="form-select"
                 >
                   <option value="not_started">Not Started</option>
                   <option value="on_track">On Track</option>
