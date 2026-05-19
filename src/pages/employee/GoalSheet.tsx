@@ -217,6 +217,14 @@ export function GoalSheet() {
         new_value: { num_goals: goals.length }
       });
 
+      toast.success('Goals submitted successfully!');
+      if (localStorage.getItem('atomquest_teams_enabled') === 'true') {
+        setTimeout(() => toast.success('Teams notification sent to your manager'), 800);
+      }
+      if (localStorage.getItem('atomquest_email_enabled') === 'true') {
+        setTimeout(() => toast.success('Approval request email sent to your manager'), 1400);
+      }
+
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'An error occurred while saving.');

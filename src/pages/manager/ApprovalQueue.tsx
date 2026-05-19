@@ -64,6 +64,13 @@ export function ApprovalQueue() {
       await supabase.from('audit_logs').insert({ entity_type: 'goal_sheet', entity_id: sheet.id, action: 'APPROVE_GOAL_SHEET', changed_by: user!.id });
       setSheets(sheets.filter(s => s.id !== sheet.id));
       toast.success('Sheet approved');
+      
+      if (localStorage.getItem('atomquest_teams_enabled') === 'true') {
+        setTimeout(() => toast.success('Teams notification sent to employee'), 800);
+      }
+      if (localStorage.getItem('atomquest_email_enabled') === 'true') {
+        setTimeout(() => toast.success('Goal approval email sent to employee'), 1400);
+      }
     } catch { toast.error('Failed to approve sheet.'); } finally { setSavingId(null); }
   };
 

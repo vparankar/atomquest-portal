@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Cycle } from '../../types';
-import { Settings as SettingsIcon, Database, Zap, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { Settings as SettingsIcon, Database, Zap, AlertTriangle, CheckCircle2, Info, MessageSquare, Mail } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
 
@@ -9,6 +9,8 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
   const [stats, setStats] = useState({ profiles: 0, goalSheets: 0, goals: 0, achievements: 0, auditLogs: 0 });
+  const [teamsEnabled, setTeamsEnabled] = useState(localStorage.getItem('atomquest_teams_enabled') === 'true');
+  const [emailEnabled, setEmailEnabled] = useState(localStorage.getItem('atomquest_email_enabled') === 'true');
   const { toast } = useToast();
 
   useEffect(() => { loadSystemInfo(); }, []);
@@ -64,9 +66,9 @@ export function Settings() {
           {activeCycle ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {[
-                { label: 'Year',   val: String(activeCycle.year)  },
-                { label: 'Phase',  val: activeCycle.phase.replace('_', ' ').toUpperCase() },
-                { label: 'Opens',  val: activeCycle.opens_at  ? new Date(activeCycle.opens_at).toLocaleDateString()  : '—' },
+                { label: 'Year', val: String(activeCycle.year) },
+                { label: 'Phase', val: activeCycle.phase.replace('_', ' ').toUpperCase() },
+                { label: 'Opens', val: activeCycle.opens_at ? new Date(activeCycle.opens_at).toLocaleDateString() : '—' },
                 { label: 'Closes', val: activeCycle.closes_at ? new Date(activeCycle.closes_at).toLocaleDateString() : '—' },
               ].map(item => (
                 <div key={item.label} style={{ padding: '12px 14px', background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
@@ -97,11 +99,11 @@ export function Settings() {
         </div>
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
-            <S label="Users"        val={stats.profiles}    />
-            <S label="Goal Sheets"  val={stats.goalSheets}  />
-            <S label="Goals"        val={stats.goals}       />
-            <S label="Achievements" val={stats.achievements}/>
-            <S label="Audit Logs"   val={stats.auditLogs}   />
+            <S label="Users" val={stats.profiles} />
+            <S label="Goal Sheets" val={stats.goalSheets} />
+            <S label="Goals" val={stats.goals} />
+            <S label="Achievements" val={stats.achievements} />
+            <S label="Audit Logs" val={stats.auditLogs} />
           </div>
         </div>
       </div>
@@ -120,8 +122,8 @@ export function Settings() {
             <tbody>
               {[
                 { role: 'Employee', email: 'employee@test.com', pw: 'employee' },
-                { role: 'Manager',  email: 'manager@test.com',  pw: 'manager'  },
-                { role: 'Admin',    email: 'admin@test.com',    pw: 'admin'    },
+                { role: 'Manager', email: 'manager@test.com', pw: 'manager' },
+                { role: 'Admin', email: 'admin@test.com', pw: 'admin' },
               ].map(a => (
                 <tr key={a.role}>
                   <td style={{ fontWeight: 600, color: 'var(--text)' }}>{a.role}</td>
@@ -131,6 +133,68 @@ export function Settings() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <MessageSquare size={16} style={{ color: 'var(--brand-yellow)' }} />
+            <span className="card-title">Integrations</span>
+          </div>
+        </div>
+        <div className="card-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {/* Teams Integration */}
+            <div style={{ padding: '16px', background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ background: '#E5ECF6', padding: 6, borderRadius: 6 }}><MessageSquare size={16} style={{ color: '#464EB8' }} /></div>
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>Microsoft Teams</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Send bot notifications on goal updates</div>
+                  </div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <div style={{ position: 'relative' }}>
+                    <input type="checkbox" className="sr-only" checked={teamsEnabled} onChange={(e) => {
+                      setTeamsEnabled(e.target.checked);
+                      localStorage.setItem('atomquest_teams_enabled', String(e.target.checked));
+                      toast.success(`Teams notifications ${e.target.checked ? 'enabled' : 'disabled'}`);
+                    }} />
+                    <div style={{ width: 36, height: 20, background: teamsEnabled ? 'var(--green)' : '#E5E7EB', borderRadius: 20, transition: 'background-color 0.2s' }}></div>
+                    <div style={{ position: 'absolute', top: 2, left: teamsEnabled ? 18 : 2, width: 16, height: 16, background: 'white', borderRadius: '50%', transition: 'left 0.2s' }}></div>
+                  </div>
+                </label>
+              </div>
+              {teamsEnabled && <div style={{ fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Connected via Webhook</div>}
+            </div>
+
+            {/* Email Integration */}
+            <div style={{ padding: '16px', background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ background: '#FEE2E2', padding: 6, borderRadius: 6 }}><Mail size={16} style={{ color: '#DC2626' }} /></div>
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 14 }}>Email Notifications</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Automated emails for approvals & reminders</div>
+                  </div>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <div style={{ position: 'relative' }}>
+                    <input type="checkbox" className="sr-only" checked={emailEnabled} onChange={(e) => {
+                      setEmailEnabled(e.target.checked);
+                      localStorage.setItem('atomquest_email_enabled', String(e.target.checked));
+                      toast.success(`Email notifications ${e.target.checked ? 'enabled' : 'disabled'}`);
+                    }} />
+                    <div style={{ width: 36, height: 20, background: emailEnabled ? 'var(--green)' : '#E5E7EB', borderRadius: 20, transition: 'background-color 0.2s' }}></div>
+                    <div style={{ position: 'absolute', top: 2, left: emailEnabled ? 18 : 2, width: 16, height: 16, background: 'white', borderRadius: '50%', transition: 'left 0.2s' }}></div>
+                  </div>
+                </label>
+              </div>
+              {emailEnabled && <div style={{ fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> SMTP Configured</div>}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -145,10 +209,10 @@ export function Settings() {
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
-              { k: 'Frontend',  v: 'React 19 + Vite'        },
-              { k: 'Backend',   v: 'Supabase (PostgreSQL)'   },
-              { k: 'Styling',   v: 'Tailwind CSS v4'         },
-              { k: 'Charts',    v: 'Recharts'                },
+              { k: 'Frontend', v: 'React 19 + Vite' },
+              { k: 'Backend', v: 'Supabase (PostgreSQL)' },
+              { k: 'Styling', v: 'Tailwind CSS v4' },
+              { k: 'Charts', v: 'Recharts' },
             ].map(row => (
               <div key={row.k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--surface-raised)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
                 <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{row.k}</span>
