@@ -4,7 +4,7 @@
 
 A fully functional, web-based Goal Setting & Tracking Portal designed to eliminate fragmented spreadsheet-based goal management. The system supports the entire lifecycle of employee goals—from creation and alignment to quarterly check-ins and performance visibility—with a modern, responsive, and intuitive interface.
 
-## 🌟 Key Features
+## Key Features
 
 ### Phase 1: Goal Creation & Approval
 - **Structured Goal Sheets:** Employees can create goals aligned with key Thrust Areas (Revenue, Cost, Customer, People, Process, Quality).
@@ -29,7 +29,7 @@ A fully functional, web-based Goal Setting & Tracking Portal designed to elimina
 
 ## 🏗 Architecture & Tech Stack
 
-![Architecture Diagram](architecture.md)
+![Architecture Diagram](./architecture-diagram.png)
 *(For full architecture details, refer to the included `architecture.md` file).*
 
 - **Frontend:** React 19 + TypeScript + Vite
@@ -59,7 +59,7 @@ Navigate to `http://localhost:5173` in your browser.
 
 ---
 
-## 🔐 Demo Accounts
+## Demo Accounts
 
 The database comes pre-seeded with three demo accounts to evaluate the distinct role journeys. 
 *(Note: Use these credentials to test the complete lifecycle without having to register new users).*
@@ -74,7 +74,7 @@ The database comes pre-seeded with three demo accounts to evaluate the distinct 
 
 ---
 
-## 📋 Evaluation Checklist Met
+## Evaluation Checklist Met
 
 - [x] **Functionality:** End-to-end flow is fully operational.
 - [x] **Adherence to BRD:** All Phase 1 & Phase 2 constraints (weightages, limits, deadlines) are strictly enforced.
