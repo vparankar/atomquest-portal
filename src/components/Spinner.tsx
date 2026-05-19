@@ -6,19 +6,17 @@ interface SpinnerProps {
   fullScreen?: boolean;
 }
 
-export function Spinner({ size = 'md', className = '', fullScreen = false }: SpinnerProps) {
-  const sizeClasses = {
-    sm: 'w-4 h-4',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12',
-  };
+const sizes = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-10 h-10' };
 
+export function Spinner({ size = 'md', className = '', fullScreen = false }: SpinnerProps) {
   const spinner = (
     <div className={`flex justify-center items-center ${className}`}>
-      <Loader2 className={`animate-spin text-indigo-600 ${sizeClasses[size]}`} />
+      <Loader2
+        className={`animate-spin ${sizes[size]}`}
+        style={{ color: 'var(--brand-yellow)' }}
+      />
     </div>
   );
-
   if (fullScreen) {
     return (
       <div className="fixed inset-0 flex justify-center items-center bg-white/80 z-50">
@@ -26,6 +24,5 @@ export function Spinner({ size = 'md', className = '', fullScreen = false }: Spi
       </div>
     );
   }
-
   return spinner;
 }

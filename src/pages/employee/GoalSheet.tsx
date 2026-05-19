@@ -234,7 +234,7 @@ export function GoalSheet() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 32px' }}>
       <div className="mb-8 flex justify-between items-center border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">My Goals</h1>

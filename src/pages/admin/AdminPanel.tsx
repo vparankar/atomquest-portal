@@ -10,39 +10,31 @@ export function AdminPanel() {
   const [activeTab, setActiveTab] = useState<'cycles' | 'unlock' | 'shared' | 'audit'>('cycles');
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="mt-2 text-sm text-gray-600">Manage cycles, goals, and system settings.</p>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 32px' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 className="page-title">Admin Dashboard</h1>
+        <p className="page-subtitle">Manage cycles, goals, and system settings.</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-            {[
-              { id: 'cycles', name: 'Cycle Management' },
-              { id: 'unlock', name: 'Goal Unlock' },
-              { id: 'shared', name: 'Shared Goals' },
-              { id: 'audit', name: 'Audit Log' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`
-                  whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                  ${activeTab === tab.id
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }
-                `}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </nav>
+      <div className="card">
+        <div className="tab-nav" style={{ padding: '0 20px' }}>
+          {[
+            { id: 'cycles', name: 'Cycle Management' },
+            { id: 'unlock', name: 'Goal Unlock' },
+            { id: 'shared', name: 'Shared Goals' },
+            { id: 'audit', name: 'Audit Log' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`tab-btn${activeTab === tab.id ? ' tab-btn-active' : ''}`}
+            >
+              {tab.name}
+            </button>
+          ))}
         </div>
 
-        <div className="p-6">
+        <div style={{ padding: 24 }}>
           {activeTab === 'cycles' && <CycleManagement />}
           {activeTab === 'unlock' && <GoalUnlock user={user} />}
           {activeTab === 'shared' && <SharedGoals />}
@@ -318,25 +310,15 @@ function CycleManagement() {
 
   return (
     <div>
-      <h2 className="text-lg font-medium text-gray-900 mb-4">Create New Cycle</h2>
-      <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+      <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Create New Cycle</h2>
+      <form onSubmit={handleCreate} style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 28, alignItems: 'flex-end' }}>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Year</label>
-          <input
-            type="number"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            required
-          />
+          <label className="form-label">Year</label>
+          <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="form-input" required />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Phase</label>
-          <select
-            value={phase}
-            onChange={(e) => setPhase(e.target.value as any)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          >
+          <label className="form-label">Phase</label>
+          <select value={phase} onChange={(e) => setPhase(e.target.value as any)} className="form-select">
             <option value="goal_setting">Goal Setting</option>
             <option value="q1">Q1</option>
             <option value="q2">Q2</option>
@@ -345,82 +327,59 @@ function CycleManagement() {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Opens At</label>
-          <input
-            type="date"
-            value={opensAt}
-            onChange={(e) => setOpensAt(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            required
-          />
+          <label className="form-label">Opens At</label>
+          <input type="date" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} className="form-input" required />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Closes At</label>
-          <input
-            type="date"
-            value={closesAt}
-            onChange={(e) => setClosesAt(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            required
-          />
+          <label className="form-label">Closes At</label>
+          <input type="date" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} className="form-input" required />
         </div>
-        <div className="flex items-end">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-indigo-600 border border-transparent rounded-md shadow-sm py-2 px-4 inline-flex justify-center text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-          >
-            {isSubmitting ? 'Creating...' : 'Create Cycle'}
+        <div>
+          <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
+            {isSubmitting ? 'Creating…' : 'Create Cycle'}
           </button>
         </div>
       </form>
 
-        <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-medium text-gray-900">Existing Cycles</h2>
-        <button
-          onClick={handleSeedData}
-          disabled={isSubmitting}
-          className="bg-green-600 border border-transparent rounded-md shadow-sm py-2 px-4 inline-flex justify-center text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-        >
-          {isSubmitting ? 'Processing...' : 'Seed Demo Data'}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Existing Cycles</h2>
+        <button onClick={handleSeedData} disabled={isSubmitting} className="btn btn-success btn-sm">
+          {isSubmitting ? 'Processing…' : 'Seed Demo Data'}
         </button>
       </div>
       {cycles.length === 0 ? (
-        <p className="text-center text-gray-500 py-6">No cycles yet. Create one above.</p>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: 13 }}>No cycles yet. Create one above.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year & Phase</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th>Year &amp; Phase</th>
+                <th>Dates</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {cycles.map((cycle) => (
                 <tr key={cycle.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
+                  <td style={{ fontWeight: 600, color: 'var(--text)', textTransform: 'capitalize' }}>
                     {cycle.year} — {cycle.phase.replace('_', ' ')}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {cycle.opens_at ? new Date(cycle.opens_at).toLocaleDateString() : '—'} to{' '}
+                  <td style={{ color: 'var(--text-secondary)' }}>
+                    {cycle.opens_at ? new Date(cycle.opens_at).toLocaleDateString() : '—'}{' '}to{' '}
                     {cycle.closes_at ? new Date(cycle.closes_at).toLocaleDateString() : '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${cycle.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}
-                    >
+                  <td>
+                    <span className={cycle.is_active ? 'badge badge-green' : 'badge badge-gray'}>
                       {cycle.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td style={{ textAlign: 'right' }}>
                     <button
                       onClick={() => handleToggleActive(cycle.id, cycle.is_active)}
                       disabled={cycle.is_active}
-                      className={`text-indigo-600 hover:text-indigo-900 ${cycle.is_active ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      style={{ fontSize: 12, fontWeight: 500, color: cycle.is_active ? 'var(--text-muted)' : 'var(--brand-yellow-dark)', background: 'none', border: 'none', cursor: cycle.is_active ? 'default' : 'pointer' }}
                     >
                       Set Active
                     </button>
@@ -496,79 +455,42 @@ function GoalUnlock({ user }: { user: any }) {
 
   return (
     <div>
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search by employee name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full md:w-1/3 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-        />
+      <div style={{ marginBottom: 14 }}>
+        <input type="text" placeholder="Search by employee name…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="form-input" style={{ maxWidth: 300 }} />
       </div>
-
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div style={{ overflowX: 'auto' }}>
+        <table className="data-table">
+          <thead>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sheet ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th>Employee</th>
+              <th>Sheet ID</th>
+              <th>Status</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {sheets.map((sheet) => (
               <tr key={sheet.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {sheet.profiles?.full_name || sheet.employee_id}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {sheet.id.slice(0, 8)}...
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                    Approved
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td style={{ fontWeight: 600, color: 'var(--text)' }}>{sheet.profiles?.full_name || sheet.employee_id}</td>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{sheet.id.slice(0, 8)}…</td>
+                <td><span className="badge badge-green">Approved</span></td>
+                <td style={{ textAlign: 'right' }}>
                   {selectedSheet === sheet.id ? (
-                    <div className="flex flex-col items-end gap-2">
-                      <input
-                        type="text"
-                        placeholder="Reason for unlock"
-                        value={reason}
-                        onChange={(e) => setReason(e.target.value)}
-                        className="text-sm rounded border-gray-300 w-48"
-                      />
-                      <div className="space-x-2">
-                        <button onClick={() => setSelectedSheet(null)} className="text-gray-500">
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => handleUnlock(sheet.id)}
-                          className="text-red-600 font-bold"
-                        >
-                          Confirm Unlock
-                        </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                      <input type="text" placeholder="Reason for unlock" value={reason} onChange={(e) => setReason(e.target.value)} className="form-input" style={{ width: 200 }} />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => setSelectedSheet(null)} className="btn btn-secondary btn-sm">Cancel</button>
+                        <button onClick={() => handleUnlock(sheet.id)} className="btn btn-danger btn-sm">Confirm Unlock</button>
                       </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setSelectedSheet(sheet.id)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      Unlock
-                    </button>
+                    <button onClick={() => setSelectedSheet(sheet.id)} className="btn btn-secondary btn-sm">Unlock</button>
                   )}
                 </td>
               </tr>
             ))}
             {sheets.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
-                  No approved sheets found.
-                </td>
-              </tr>
+              <tr><td colSpan={4} style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No approved sheets found.</td></tr>
             )}
           </tbody>
         </table>
@@ -698,47 +620,26 @@ function SharedGoals() {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
       <div>
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Create Shared Goal</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Create Shared Goal</h2>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Thrust Area</label>
-            <input
-              type="text"
-              required
-              value={thrustArea}
-              onChange={(e) => setThrustArea(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
+            <label className="form-label">Thrust Area</label>
+            <input type="text" required value={thrustArea} onChange={(e) => setThrustArea(e.target.value)} className="form-input" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Title</label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
+            <label className="form-label">Title</label>
+            <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className="form-input" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
+            <label className="form-label">Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="form-textarea" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700">UoM Type</label>
-              <select
-                value={uomType}
-                onChange={(e) => setUomType(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              >
+              <label className="form-label">UoM Type</label>
+              <select value={uomType} onChange={(e) => setUomType(e.target.value)} className="form-select">
                 <option value="timeline">Timeline (Date)</option>
                 <option value="max">Maximize (Number)</option>
                 <option value="min">Minimize (Number)</option>
@@ -746,46 +647,28 @@ function SharedGoals() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Target</label>
-              <input
-                type={uomType === 'timeline' ? 'date' : 'number'}
-                required
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              />
+              <label className="form-label">Target</label>
+              <input type={uomType === 'timeline' ? 'date' : 'number'} required value={target} onChange={(e) => setTarget(e.target.value)} className="form-input" />
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {isSubmitting ? 'Assigning...' : 'Assign Shared Goal'}
+          <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ marginTop: 4 }}>
+            {isSubmitting ? 'Assigning…' : 'Assign Shared Goal'}
           </button>
         </form>
       </div>
 
       <div>
-        <h2 className="text-lg font-medium text-gray-900 mb-4">
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>
           Select Employees ({selectedEmployees.length} selected)
         </h2>
-        <div className="border border-gray-200 rounded-md max-h-[500px] overflow-y-auto p-4 space-y-2 bg-gray-50">
-          {employees.length === 0 && (
-            <p className="text-sm text-gray-500 text-center">No employees found.</p>
-          )}
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', maxHeight: 400, overflowY: 'auto', padding: 12, background: 'var(--surface-raised)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {employees.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>No employees found.</p>}
           {employees.map((emp) => (
-            <div key={emp.id} className="flex items-center">
-              <input
-                type="checkbox"
-                id={`emp-${emp.id}`}
-                checked={selectedEmployees.includes(emp.id)}
-                onChange={() => handleToggleEmployee(emp.id)}
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-              <label htmlFor={`emp-${emp.id}`} className="ml-3 block text-sm font-medium text-gray-700">
+            <div key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" id={`emp-${emp.id}`} checked={selectedEmployees.includes(emp.id)} onChange={() => handleToggleEmployee(emp.id)} style={{ accentColor: 'var(--brand-yellow)', width: 15, height: 15 }} />
+              <label htmlFor={`emp-${emp.id}`} style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', cursor: 'pointer' }}>
                 {emp.full_name || 'Unnamed'}{' '}
-                <span className="text-gray-400 text-xs">({emp.role})</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({emp.role})</span>
               </label>
             </div>
           ))}

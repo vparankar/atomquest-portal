@@ -3,19 +3,8 @@ import type { ReactNode } from 'react';
 import { CheckCircle, XCircle, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error';
-
-interface Toast {
-  id: string;
-  message: string;
-  type: ToastType;
-}
-
-interface ToastContextType {
-  toast: {
-    success: (message: string) => void;
-    error: (message: string) => void;
-  };
-}
+interface Toast { id: string; message: string; type: ToastType; }
+interface ToastContextType { toast: { success: (m: string) => void; error: (m: string) => void; }; }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
@@ -24,44 +13,40 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback((message: string, type: ToastType) => {
     const id = Math.random().toString(36).substr(2, 9);
-    setToasts((prev) => [...prev, { id, message, type }]);
-
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 5000); // Remove after 5s
+    setToasts(p => [...p, { id, message, type }]);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 5000);
   }, []);
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
+  const remove = (id: string) => setToasts(p => p.filter(t => t.id !== id));
   const toast = {
-    success: (message: string) => addToast(message, 'success'),
-    error: (message: string) => addToast(message, 'error'),
+    success: (m: string) => addToast(m, 'success'),
+    error:   (m: string) => addToast(m, 'error'),
   };
 
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`flex items-center gap-3 min-w-[300px] p-4 rounded-lg shadow-lg border transition-all transform animate-in slide-in-from-bottom-5 fade-in duration-300 ${
-              t.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
-            }`}
-          >
-            {t.type === 'success' ? (
-              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-            ) : (
-              <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-            )}
-            <p className="flex-1 text-sm font-medium">{t.message}</p>
-            <button
-              onClick={() => removeToast(t.id)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="w-4 h-4" />
+      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {toasts.map(t => (
+          <div key={t.id} style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            minWidth: 300, maxWidth: 420,
+            padding: '10px 14px',
+            background: t.type === 'success' ? '#F0FDF4' : '#FEF2F2',
+            border: `1px solid ${t.type === 'success' ? '#BBF7D0' : '#FECACA'}`,
+            borderRadius: 4,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
+            animation: 'slideUp 0.2s ease',
+          }}>
+            {t.type === 'success'
+              ? <CheckCircle size={16} style={{ color: '#16A34A', flexShrink: 0 }} />
+              : <XCircle    size={16} style={{ color: '#DC2626', flexShrink: 0 }} />
+            }
+            <p style={{ flex: 1, fontSize: 13, fontWeight: 500, color: t.type === 'success' ? '#15803D' : '#991B1B', margin: 0 }}>
+              {t.message}
+            </p>
+            <button onClick={() => remove(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 0, display: 'flex' }}>
+              <X size={14} />
             </button>
           </div>
         ))}
@@ -71,9 +56,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 export function useToast() {
-  const context = useContext(ToastContext);
-  if (context === undefined) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error('useToast must be used within ToastProvider');
+  return ctx;
 }

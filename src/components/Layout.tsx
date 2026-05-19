@@ -2,19 +2,22 @@ import { useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { LogOut, Home, Settings, Users, FileText, UserCircle, Loader2, BarChart3, PieChart } from 'lucide-react';
+import {
+  LogOut, Home, Settings, Users, FileText,
+  UserCircle, Loader2, BarChart3, PieChart,
+} from 'lucide-react';
 import '../index.css';
 
 const DEMO_CREDENTIALS = {
   employee: { email: 'employee@test.com', password: 'employee' },
-  manager: { email: 'manager@test.com', password: 'manager' },
-  admin: { email: 'admin@test.com', password: 'admin' },
+  manager:  { email: 'manager@test.com',  password: 'manager'  },
+  admin:    { email: 'admin@test.com',    password: 'admin'    },
 };
 
 const ROLE_HOME = {
   employee: '/employee',
-  manager: '/manager',
-  admin: '/admin',
+  manager:  '/manager',
+  admin:    '/admin',
 };
 
 export function Layout() {
@@ -28,7 +31,6 @@ export function Layout() {
     navigate('/');
   };
 
-  // ✅ Actually signs in as the demo user for that role
   const switchRole = async (newRole: 'employee' | 'manager' | 'admin') => {
     if (switching || newRole === role) return;
     setSwitching(true);
@@ -38,81 +40,104 @@ export function Layout() {
       setSwitching(false);
       return;
     }
-    // useAuth() will pick up the new session automatically
     navigate(ROLE_HOME[newRole]);
     setSwitching(false);
   };
 
   if (loading) {
-    return <div className="loading-screen">Loading...</div>;
+    return (
+      <div className="loading-screen">
+        <div className="brand-mark" style={{ width: 32, height: 32, marginBottom: 8 }}>
+          <span>AQ</span>
+        </div>
+        <span>Loading...</span>
+      </div>
+    );
   }
 
   let navItems: { name: string; path: string; icon: any }[] = [];
   if (role === 'admin') {
     navItems = [
-      { name: 'Admin Dashboard', path: '/admin', icon: Home },
-      { name: 'Analytics', path: '/admin/analytics', icon: PieChart },
-      { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
-      { name: 'Manage Users', path: '/admin/users', icon: Users },
-      { name: 'Settings', path: '/admin/settings', icon: Settings },
+      { name: 'Dashboard',    path: '/admin',          icon: Home      },
+      { name: 'Analytics',   path: '/admin/analytics', icon: PieChart  },
+      { name: 'Reports',     path: '/admin/reports',   icon: BarChart3 },
+      { name: 'Manage Users',path: '/admin/users',     icon: Users     },
+      { name: 'Settings',    path: '/admin/settings',  icon: Settings  },
     ];
   } else if (role === 'manager') {
     navItems = [
-      { name: 'Manager Dashboard', path: '/manager', icon: Home },
-      { name: 'Team Goals', path: '/manager/team', icon: Users },
-      { name: 'Reviews', path: '/manager/reviews', icon: FileText },
+      { name: 'Dashboard', path: '/manager',         icon: Home      },
+      { name: 'Team Goals',path: '/manager/team',    icon: Users     },
+      { name: 'Reviews',   path: '/manager/reviews', icon: FileText  },
     ];
   } else {
     navItems = [
-      { name: 'My Dashboard', path: '/employee', icon: Home },
-      { name: 'My Goals', path: '/employee/goals', icon: FileText },
-      { name: 'Check-In', path: '/employee/checkin', icon: FileText },
-      { name: 'Profile', path: '/employee/profile', icon: UserCircle },
+      { name: 'Dashboard', path: '/employee',          icon: Home       },
+      { name: 'My Goals',  path: '/employee/goals',    icon: FileText   },
+      { name: 'Check-In',  path: '/employee/checkin',  icon: BarChart3  },
+      { name: 'Profile',   path: '/employee/profile',  icon: UserCircle },
     ];
   }
+
+  const roleLabel = role
+    ? role.charAt(0).toUpperCase() + role.slice(1)
+    : '';
 
   return (
     <div className="layout-container">
       <aside className="sidebar">
+        {/* Header */}
         <div className="sidebar-header">
-          <h1 className="brand-title">AtomQuest</h1>
+          <div className="brand-mark">
+            <span>AQ</span>
+          </div>
+          <div>
+            <div className="brand-title">AtomQuest</div>
+            <span className="brand-subtitle">by Atomberg</span>
+          </div>
         </div>
 
+        {/* Nav */}
         <nav className="sidebar-nav">
           {navItems.map((item) => {
             const Icon = item.icon;
-            // Root paths (e.g., /admin, /employee, /manager) need exact match
-            // to avoid staying highlighted on sub-routes
-            const isRootPath = item.path === '/admin' || item.path === '/employee' || item.path === '/manager';
-            const isActive = isRootPath
+            const isRoot =
+              item.path === '/admin' ||
+              item.path === '/employee' ||
+              item.path === '/manager';
+            const isActive = isRoot
               ? location.pathname === item.path
               : location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
+                className={`nav-item${isActive ? ' nav-item-active' : ''}`}
               >
-                <Icon size={20} />
+                <Icon size={16} />
                 <span>{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
+        {/* Footer */}
         <div className="sidebar-footer">
+          {/* Role switcher */}
           <div className="demo-switcher">
-            <p className="demo-title">
-              Demo: Switch Role
-              {switching && <Loader2 size={12} className="inline ml-2 animate-spin" />}
-            </p>
+            <div className="demo-title">
+              Demo Role
+              {switching && (
+                <Loader2 size={10} className="animate-spin" style={{ color: 'var(--brand-yellow)' }} />
+              )}
+            </div>
             <div className="demo-buttons">
               {(['employee', 'manager', 'admin'] as const).map((r) => (
                 <button
                   key={r}
                   onClick={() => switchRole(r)}
                   disabled={switching || r === role}
-                  className={`demo-btn ${role === r ? 'demo-btn-active' : ''}`}
+                  className={`demo-btn${role === r ? ' demo-btn-active' : ''}`}
                 >
                   {r.charAt(0).toUpperCase() + r.slice(1)}
                 </button>
@@ -120,9 +145,25 @@ export function Layout() {
             </div>
           </div>
 
+          {/* Current role indicator */}
+          <div style={{
+            padding: '7px 10px',
+            fontSize: 11,
+            color: 'var(--sidebar-text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: 'var(--brand-yellow)', flexShrink: 0,
+            }} />
+            Signed in as <strong style={{ color: 'var(--sidebar-text)' }}>{roleLabel}</strong>
+          </div>
+
           <button onClick={handleLogout} className="logout-btn">
-            <LogOut size={20} />
-            <span>Logout</span>
+            <LogOut size={15} />
+            <span>Sign out</span>
           </button>
         </div>
       </aside>

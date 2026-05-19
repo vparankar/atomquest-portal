@@ -16,303 +16,166 @@ export function ApprovalQueue() {
   const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
   const [sheets, setSheets] = useState<GoalSheetWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
-  // Rework Modal State
   const [reworkSheetId, setReworkSheetId] = useState<string | null>(null);
   const [reworkComment, setReworkComment] = useState('');
-
-  // Saving State
   const [savingId, setSavingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const fetchSheets = async () => {
     if (!user) return;
     setLoading(true);
     try {
       const statusFilter = activeTab === 'pending' ? 'submitted' : 'approved';
-      const { data, error: fetchErr } = await supabase
-        .from('goal_sheets')
-        .select(`
-          *,
-          profiles!goal_sheets_employee_id_fkey!inner(*),
-          goals(*)
-        `)
-        .eq('status', statusFilter)
-        .eq('profiles.manager_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (fetchErr) throw fetchErr;
-
+      const { data, error } = await supabase.from('goal_sheets').select('*, profiles!goal_sheets_employee_id_fkey!inner(*), goals(*)').eq('status', statusFilter).eq('profiles.manager_id', user.id).order('created_at', { ascending: false });
+      if (error) throw error;
       setSheets((data as any) || []);
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to fetch approval queue.');
-    } finally {
-      setLoading(false);
-    }
+    } catch { toast.error('Failed to fetch approval queue.'); } finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchSheets();
-  }, [user, activeTab]);
+  useEffect(() => { fetchSheets(); }, [user, activeTab]);
 
   const updateGoal = (sheetId: string, goalId: string, field: keyof Goal, value: any) => {
-    setSheets(sheets.map(sheet => {
-      if (sheet.id === sheetId) {
-        return {
-          ...sheet,
-          goals: sheet.goals.map(g => g.id === goalId ? { ...g, [field]: value } : g)
-        };
-      }
-      return sheet;
-    }));
+    setSheets(sheets.map(s => s.id === sheetId ? { ...s, goals: s.goals.map(g => g.id === goalId ? { ...g, [field]: value } : g) } : s));
   };
 
   const validateSheet = (sheet: GoalSheetWithRelations) => {
-    const totalWeightage = sheet.goals.reduce((sum, g) => sum + (Number(g.weightage) || 0), 0);
-    if (totalWeightage !== 100) return "Total weightage must be exactly 100%";
-
+    const total = sheet.goals.reduce((s, g) => s + (Number(g.weightage) || 0), 0);
+    if (total !== 100) return 'Total weightage must be exactly 100%';
     for (let i = 0; i < sheet.goals.length; i++) {
       const g = sheet.goals[i];
-      if (!g.weightage || g.weightage < 10 || g.weightage > 90) return `Goal ${i + 1}: Weightage must be between 10% and 90%`;
-      if (g.uom_type === 'timeline' && !g.target_date) return `Goal ${i + 1}: Target date is required`;
-      if (g.uom_type !== 'timeline' && (g.target_value === undefined || g.target_value === null || isNaN(Number(g.target_value)))) return `Goal ${i + 1}: Target value is required`;
+      if (!g.weightage || g.weightage < 10 || g.weightage > 90) return `Goal ${i + 1}: Weightage must be 10–90%`;
+      if (g.uom_type === 'timeline' && !g.target_date) return `Goal ${i + 1}: Target date required`;
+      if (g.uom_type !== 'timeline' && (g.target_value === undefined || g.target_value === null || isNaN(Number(g.target_value)))) return `Goal ${i + 1}: Target value required`;
     }
     return null;
   };
 
   const handleApprove = async (sheet: GoalSheetWithRelations) => {
-    const validationError = validateSheet(sheet);
-    if (validationError) {
-      toast.error(validationError);
-      return;
-    }
-
+    const err = validateSheet(sheet);
+    if (err) { toast.error(err); return; }
     setSavingId(sheet.id);
     try {
-      // First update all goals that might have been changed
-      for (const goal of sheet.goals) {
-        const { error: goalErr } = await supabase
-          .from('goals')
-          .update({
-            weightage: goal.weightage,
-            target_value: goal.target_value,
-            target_date: goal.target_date
-          })
-          .eq('id', goal.id);
-        if (goalErr) throw goalErr;
+      for (const g of sheet.goals) {
+        const { error } = await supabase.from('goals').update({ weightage: g.weightage, target_value: g.target_value, target_date: g.target_date }).eq('id', g.id);
+        if (error) throw error;
       }
-
-      // Update sheet status
-      const { error: sheetErr } = await supabase
-        .from('goal_sheets')
-        .update({
-          status: 'approved',
-          approved_at: new Date().toISOString(),
-          approved_by: user!.id
-        })
-        .eq('id', sheet.id);
-
-      if (sheetErr) throw sheetErr;
-
-      // Audit log
-      await supabase.from('audit_logs').insert({
-        entity_type: 'goal_sheet',
-        entity_id: sheet.id,
-        action: 'APPROVE_GOAL_SHEET',
-        changed_by: user!.id
-      });
-
-      // Remove from list
+      const { error } = await supabase.from('goal_sheets').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: user!.id }).eq('id', sheet.id);
+      if (error) throw error;
+      await supabase.from('audit_logs').insert({ entity_type: 'goal_sheet', entity_id: sheet.id, action: 'APPROVE_GOAL_SHEET', changed_by: user!.id });
       setSheets(sheets.filter(s => s.id !== sheet.id));
-      toast.success('Sheet approved successfully');
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to approve sheet.');
-    } finally {
-      setSavingId(null);
-    }
+      toast.success('Sheet approved');
+    } catch { toast.error('Failed to approve sheet.'); } finally { setSavingId(null); }
   };
 
   const handleReworkSubmit = async () => {
-    if (!reworkSheetId) return;
-    if (!reworkComment.trim()) {
-      toast.error("Please provide a comment for rework.");
-      return;
-    }
-
+    if (!reworkSheetId || !reworkComment.trim()) { toast.error('Please provide a comment.'); return; }
     setSavingId(reworkSheetId);
     try {
-      const { error: sheetErr } = await supabase
-        .from('goal_sheets')
-        .update({
-          status: 'rework',
-          manager_comment: reworkComment
-        })
-        .eq('id', reworkSheetId);
-
-      if (sheetErr) throw sheetErr;
-
-      // Audit log
-      await supabase.from('audit_logs').insert({
-        entity_type: 'goal_sheet',
-        entity_id: reworkSheetId,
-        action: 'RETURN_FOR_REWORK',
-        changed_by: user!.id,
-        new_value: { comment: reworkComment }
-      });
-
-      // Remove from list
+      const { error } = await supabase.from('goal_sheets').update({ status: 'rework', manager_comment: reworkComment }).eq('id', reworkSheetId);
+      if (error) throw error;
+      await supabase.from('audit_logs').insert({ entity_type: 'goal_sheet', entity_id: reworkSheetId, action: 'RETURN_FOR_REWORK', changed_by: user!.id, new_value: { comment: reworkComment } });
       setSheets(sheets.filter(s => s.id !== reworkSheetId));
-      setReworkSheetId(null);
-      setReworkComment('');
+      setReworkSheetId(null); setReworkComment('');
       toast.success('Sheet returned for rework');
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to return for rework.');
-    } finally {
-      setSavingId(null);
-    }
+    } catch { toast.error('Failed.'); } finally { setSavingId(null); }
   };
 
-  if (loading && sheets.length === 0) {
-    return <div className="p-8"><Spinner /></div>;
-  }
+  if (loading && sheets.length === 0) return <div style={{ padding: 32 }}><Spinner /></div>;
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4">
-      <div className="mb-8 border-b border-slate-200">
-        <h1 className="text-2xl font-semibold text-slate-900 mb-6">Team Goal Approvals</h1>
-        <div className="flex space-x-8">
-          <button
-            className={`pb-4 px-2 border-b-2 font-medium text-sm transition-colors ${activeTab === 'pending' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
-            onClick={() => setActiveTab('pending')}
-          >
-            Pending Approvals
-          </button>
-          <button
-            className={`pb-4 px-2 border-b-2 font-medium text-sm transition-colors ${activeTab === 'approved' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
-            onClick={() => setActiveTab('approved')}
-          >
-            Approved
-          </button>
-        </div>
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 32px' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 className="page-title">Team Goal Approvals</h1>
+        <p className="page-subtitle">Review and approve submitted goal sheets from your team.</p>
       </div>
 
-      <div className="space-y-6">
+      {/* Tabs */}
+      <div className="tab-nav" style={{ marginBottom: 20 }}>
+        {(['pending', 'approved'] as const).map(t => (
+          <button key={t} onClick={() => setActiveTab(t)} className={`tab-btn${activeTab === t ? ' tab-btn-active' : ''}`}>
+            {t === 'pending' ? 'Pending Approvals' : 'Approved'}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {sheets.length === 0 && !loading && (
-          <div className="text-center p-12 bg-slate-50 border border-dashed border-slate-300 rounded-md">
-            <Check className="mx-auto h-12 w-12 text-slate-400 mb-3" />
-            <h3 className="text-sm font-medium text-slate-900">All caught up!</h3>
-            <p className="text-sm text-slate-500 mt-1">No goal sheets in this queue.</p>
+          <div className="card">
+            <div className="empty-state">
+              <Check size={32} className="empty-state-icon" />
+              <div className="empty-state-title">All caught up!</div>
+              <div className="empty-state-text">No goal sheets in this queue.</div>
+            </div>
           </div>
         )}
 
-        {sheets.map((sheet) => {
-          const totalWeightage = sheet.goals.reduce((sum, g) => sum + (Number(g.weightage) || 0), 0);
+        {sheets.map(sheet => {
+          const totalW = sheet.goals.reduce((s, g) => s + (Number(g.weightage) || 0), 0);
           const isPending = activeTab === 'pending';
-
           return (
-            <div key={sheet.id} className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-              <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+            <div key={sheet.id} className="card">
+              {/* Card header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">{sheet.profiles.full_name || 'Unknown Employee'}</h3>
-                  <p className="text-sm text-slate-500">Submitted on {new Date(sheet.created_at || '').toLocaleDateString()}</p>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{sheet.profiles.full_name || 'Unknown'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Submitted {new Date(sheet.created_at || '').toLocaleDateString()}</div>
                 </div>
                 {isPending && (
-                  <div className="flex items-center space-x-3 w-full sm:w-auto">
-                    <button
-                      onClick={() => setReworkSheetId(sheet.id)}
-                      disabled={savingId === sheet.id}
-                      className="flex-1 sm:flex-none px-4 py-2 border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 disabled:opacity-50"
-                    >
-                      Return for Rework
-                    </button>
-                    <button
-                      onClick={() => handleApprove(sheet)}
-                      disabled={savingId === sheet.id || totalWeightage !== 100}
-                      className="flex-1 sm:flex-none justify-center items-center px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50"
-                    >
-                      {savingId === sheet.id ? 'Saving...' : 'Approve'}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setReworkSheetId(sheet.id)} disabled={savingId === sheet.id} className="btn btn-secondary btn-sm">Return for Rework</button>
+                    <button onClick={() => handleApprove(sheet)} disabled={savingId === sheet.id || totalW !== 100} className="btn btn-primary btn-sm">
+                      {savingId === sheet.id ? 'Saving…' : 'Approve'}
                     </button>
                   </div>
                 )}
               </div>
 
-              <div className="px-6 py-5">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200">
-                    <thead>
-                      <tr>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Thrust Area</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider w-1/3">Title</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Target</th>
-                        <th className="px-3 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Weightage</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {sheet.goals.map((goal) => (
-                        <tr key={goal.id}>
-                          <td className="px-3 py-4 text-sm text-slate-700">{goal.thrust_area}</td>
-                          <td className="px-3 py-4 text-sm text-slate-900 font-medium">
-                            {goal.title}
-                            {goal.description && <p className="text-xs text-slate-500 mt-1 font-normal">{goal.description}</p>}
-                          </td>
-                          <td className="px-3 py-4 text-sm text-slate-500">{goal.uom_type}</td>
-                          <td className="px-3 py-4 text-sm">
-                            {isPending ? (
-                              goal.uom_type === 'timeline' ? (
-                                <input
-                                  type="date"
-                                  value={goal.target_date || ''}
-                                  onChange={(e) => updateGoal(sheet.id, goal.id, 'target_date', e.target.value)}
-                                  className="w-full min-w-[130px] border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                />
-                              ) : (
-                                <input
-                                  type="number"
-                                  value={goal.target_value ?? ''}
-                                  onChange={(e) => updateGoal(sheet.id, goal.id, 'target_value', parseFloat(e.target.value))}
-                                  className="w-full min-w-[100px] border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                                />
-                              )
-                            ) : (
-                              <span className="text-slate-700">
-                                {goal.uom_type === 'timeline' ? goal.target_date : goal.target_value}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-4 text-sm text-right">
-                            {isPending ? (
-                              <div className="flex items-center justify-end">
-                                <input
-                                  type="number"
-                                  value={goal.weightage || ''}
-                                  onChange={(e) => updateGoal(sheet.id, goal.id, 'weightage', parseInt(e.target.value) || 0)}
-                                  className="w-20 border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-right"
-                                />
-                                <span className="ml-1 text-slate-500">%</span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-700 font-medium">{goal.weightage}%</span>
-                            )}
-                          </td>
-                        </tr>
+              {/* Goals table */}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
+                      {['Thrust Area', 'Title', 'Type', 'Target', 'Weightage'].map(h => (
+                        <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{h}</th>
                       ))}
-                    </tbody>
-                    {isPending && (
-                      <tfoot>
-                        <tr>
-                          <td colSpan={4} className="px-3 py-4 text-sm font-medium text-right text-slate-700">Total Weightage:</td>
-                          <td className={`px-3 py-4 text-sm font-bold text-right ${totalWeightage === 100 ? 'text-green-600' : 'text-red-600'}`}>
-                            {totalWeightage}%
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
-                </div>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sheet.goals.map(goal => (
+                      <tr key={goal.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px 16px', color: 'var(--text-secondary)' }}>{goal.thrust_area}</td>
+                        <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text)' }}>
+                          {goal.title}
+                          {goal.description && <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontWeight: 400 }}>{goal.description}</p>}
+                        </td>
+                        <td style={{ padding: '10px 16px', color: 'var(--text-muted)', fontSize: 12 }}>{goal.uom_type}</td>
+                        <td style={{ padding: '10px 16px' }}>
+                          {isPending ? (
+                            goal.uom_type === 'timeline'
+                              ? <input type="date" value={goal.target_date || ''} onChange={e => updateGoal(sheet.id, goal.id, 'target_date', e.target.value)} className="form-input" style={{ width: 140 }} />
+                              : <input type="number" value={goal.target_value ?? ''} onChange={e => updateGoal(sheet.id, goal.id, 'target_value', parseFloat(e.target.value))} className="form-input" style={{ width: 100 }} />
+                          ) : <span style={{ color: 'var(--text-secondary)' }}>{goal.uom_type === 'timeline' ? goal.target_date : goal.target_value}</span>}
+                        </td>
+                        <td style={{ padding: '10px 16px' }}>
+                          {isPending ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <input type="number" value={goal.weightage || ''} onChange={e => updateGoal(sheet.id, goal.id, 'weightage', parseInt(e.target.value) || 0)} className="form-input" style={{ width: 64, textAlign: 'right' }} />
+                              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>%</span>
+                            </div>
+                          ) : <span style={{ fontWeight: 600, color: 'var(--text)' }}>{goal.weightage}%</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {isPending && (
+                    <tfoot>
+                      <tr style={{ borderTop: '1px solid var(--border)' }}>
+                        <td colSpan={4} style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>Total Weightage:</td>
+                        <td style={{ padding: '10px 16px', fontSize: 13, fontWeight: 700, color: totalW === 100 ? 'var(--green)' : 'var(--red)' }}>{totalW}%</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
               </div>
             </div>
           );
@@ -321,48 +184,24 @@ export function ApprovalQueue() {
 
       {/* Rework Modal */}
       {reworkSheetId && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="text-lg font-medium text-slate-900 flex items-center">
-                <MessageSquare size={18} className="mr-2 text-slate-500" />
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}>
+          <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-md)', width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                <MessageSquare size={16} style={{ color: 'var(--text-muted)' }} />
                 Return for Rework
-              </h3>
-              <button
-                onClick={() => { setReworkSheetId(null); setReworkComment(''); }}
-                className="text-slate-400 hover:text-slate-500"
-              >
-                <X size={20} />
-              </button>
+              </div>
+              <button onClick={() => { setReworkSheetId(null); setReworkComment(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}><X size={18} /></button>
             </div>
-            <div className="p-6">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Manager Comments
-              </label>
-              <textarea
-                rows={4}
-                value={reworkComment}
-                onChange={(e) => setReworkComment(e.target.value)}
-                placeholder="Explain what needs to be changed..."
-                className="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
-              <p className="mt-2 text-sm text-slate-500">
-                These comments will be visible to the employee.
-              </p>
+            <div style={{ padding: 20 }}>
+              <label className="form-label">Manager Comments</label>
+              <textarea rows={4} value={reworkComment} onChange={e => setReworkComment(e.target.value)} placeholder="Explain what needs to be changed…" className="form-textarea" />
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>These comments will be visible to the employee.</p>
             </div>
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end space-x-3">
-              <button
-                onClick={() => { setReworkSheetId(null); setReworkComment(''); }}
-                className="px-4 py-2 border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReworkSubmit}
-                disabled={savingId === reworkSheetId || !reworkComment.trim()}
-                className="px-4 py-2 bg-amber-600 text-white hover:bg-amber-700 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-600 disabled:opacity-50"
-              >
-                {savingId === reworkSheetId ? 'Sending...' : 'Return to Employee'}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
+              <button onClick={() => { setReworkSheetId(null); setReworkComment(''); }} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleReworkSubmit} disabled={savingId === reworkSheetId || !reworkComment.trim()} className="btn btn-primary">
+                {savingId === reworkSheetId ? 'Sending…' : 'Return to Employee'}
               </button>
             </div>
           </div>

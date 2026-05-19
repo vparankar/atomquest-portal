@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Cycle } from '../../types';
-import { Settings as SettingsIcon, Database, Zap, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
+import { Settings as SettingsIcon, Database, Zap, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
 
@@ -11,14 +11,11 @@ export function Settings() {
   const [stats, setStats] = useState({ profiles: 0, goalSheets: 0, goals: 0, achievements: 0, auditLogs: 0 });
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadSystemInfo();
-  }, []);
+  useEffect(() => { loadSystemInfo(); }, []);
 
   async function loadSystemInfo() {
     try {
       setLoading(true);
-
       const [cycleRes, profilesRes, sheetsRes, goalsRes, achRes, logsRes] = await Promise.all([
         supabase.from('cycles').select('*').eq('is_active', true).maybeSingle(),
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
@@ -27,120 +24,109 @@ export function Settings() {
         supabase.from('achievements').select('id', { count: 'exact', head: true }),
         supabase.from('audit_logs').select('id', { count: 'exact', head: true }),
       ]);
-
       setActiveCycle(cycleRes.data);
-      setStats({
-        profiles: profilesRes.count || 0,
-        goalSheets: sheetsRes.count || 0,
-        goals: goalsRes.count || 0,
-        achievements: achRes.count || 0,
-        auditLogs: logsRes.count || 0,
-      });
+      setStats({ profiles: profilesRes.count || 0, goalSheets: sheetsRes.count || 0, goals: goalsRes.count || 0, achievements: achRes.count || 0, auditLogs: logsRes.count || 0 });
     } catch (err: any) {
-      console.error(err);
       toast.error('Failed to load system info');
     } finally {
       setLoading(false);
     }
   }
 
-  if (loading) return <div className="p-8"><Spinner /></div>;
+  if (loading) return <div style={{ padding: 32 }}><Spinner /></div>;
+
+  const S = ({ label, val }: { label: string; val: number }) => (
+    <div style={{ textAlign: 'center', padding: '16px 12px', background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+      <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', letterSpacing: -0.5 }}>{val}</div>
+      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 4 }}>{label}</div>
+    </div>
+  );
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-          <SettingsIcon size={28} className="text-gray-400" />
-          System Settings
-        </h1>
-        <p className="mt-2 text-sm text-gray-500">System status, database statistics, and configuration.</p>
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 32px' }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <SettingsIcon size={20} style={{ color: 'var(--text-muted)' }} />
+          <h1 className="page-title">System Settings</h1>
+        </div>
+        <p className="page-subtitle">System status, database statistics, and configuration.</p>
       </div>
 
-      {/* Active Cycle Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Zap size={18} className="text-amber-500" />
-          Active Cycle
-        </h2>
-        {activeCycle ? (
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <div className="p-4 bg-indigo-50 rounded-xl">
-              <p className="text-xs font-medium text-indigo-500 uppercase tracking-wider">Year</p>
-              <p className="text-2xl font-bold text-indigo-700 mt-1">{activeCycle.year}</p>
-            </div>
-            <div className="p-4 bg-emerald-50 rounded-xl">
-              <p className="text-xs font-medium text-emerald-500 uppercase tracking-wider">Phase</p>
-              <p className="text-2xl font-bold text-emerald-700 mt-1 capitalize">{activeCycle.phase.replace('_', ' ')}</p>
-            </div>
-            <div className="p-4 bg-blue-50 rounded-xl">
-              <p className="text-xs font-medium text-blue-500 uppercase tracking-wider">Opens</p>
-              <p className="text-lg font-bold text-blue-700 mt-1">
-                {activeCycle.opens_at ? new Date(activeCycle.opens_at).toLocaleDateString() : '—'}
-              </p>
-            </div>
-            <div className="p-4 bg-rose-50 rounded-xl">
-              <p className="text-xs font-medium text-rose-500 uppercase tracking-wider">Closes</p>
-              <p className="text-lg font-bold text-rose-700 mt-1">
-                {activeCycle.closes_at ? new Date(activeCycle.closes_at).toLocaleDateString() : '—'}
-              </p>
-            </div>
+      {/* Active Cycle */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Zap size={16} style={{ color: 'var(--amber)' }} />
+            <span className="card-title">Active Cycle</span>
           </div>
-        ) : (
-          <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl text-center">
-            <AlertTriangle size={24} className="mx-auto text-amber-500 mb-2" />
-            <p className="text-sm text-amber-800 font-medium">No active cycle configured</p>
-            <p className="text-xs text-amber-600 mt-1">Go to Admin Dashboard → Cycle Management to create and activate a cycle.</p>
-          </div>
-        )}
-      </div>
-
-      {/* Database Statistics */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Database size={18} className="text-blue-500" />
-          Database Statistics
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          {[
-            { label: 'Users', value: stats.profiles, color: 'indigo' },
-            { label: 'Goal Sheets', value: stats.goalSheets, color: 'emerald' },
-            { label: 'Goals', value: stats.goals, color: 'blue' },
-            { label: 'Achievements', value: stats.achievements, color: 'purple' },
-            { label: 'Audit Logs', value: stats.auditLogs, color: 'amber' },
-          ].map(item => (
-            <div key={item.label} className="text-center p-4 bg-gray-50 rounded-xl">
-              <p className="text-3xl font-extrabold text-gray-900">{item.value}</p>
-              <p className="text-xs font-medium text-gray-500 mt-1 uppercase tracking-wider">{item.label}</p>
+        </div>
+        <div className="card-body">
+          {activeCycle ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+              {[
+                { label: 'Year',   val: String(activeCycle.year)  },
+                { label: 'Phase',  val: activeCycle.phase.replace('_', ' ').toUpperCase() },
+                { label: 'Opens',  val: activeCycle.opens_at  ? new Date(activeCycle.opens_at).toLocaleDateString()  : '—' },
+                { label: 'Closes', val: activeCycle.closes_at ? new Date(activeCycle.closes_at).toLocaleDateString() : '—' },
+              ].map(item => (
+                <div key={item.label} style={{ padding: '12px 14px', background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{item.label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', textTransform: 'capitalize' }}>{item.val}</div>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <div className="alert alert-amber">
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <strong>No active cycle</strong>
+                <p style={{ marginTop: 2, fontSize: 12 }}>Go to Admin Dashboard → Cycle Management to create and activate a cycle.</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Demo Account Info */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Info size={18} className="text-gray-400" />
-          Demo Accounts
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="py-2 px-4 text-left text-xs font-semibold text-gray-500 uppercase">Role</th>
-                <th className="py-2 px-4 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
-                <th className="py-2 px-4 text-left text-xs font-semibold text-gray-500 uppercase">Password</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+      {/* DB Stats */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Database size={16} style={{ color: 'var(--blue)' }} />
+            <span className="card-title">Database Statistics</span>
+          </div>
+        </div>
+        <div className="card-body">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
+            <S label="Users"        val={stats.profiles}    />
+            <S label="Goal Sheets"  val={stats.goalSheets}  />
+            <S label="Goals"        val={stats.goals}       />
+            <S label="Achievements" val={stats.achievements}/>
+            <S label="Audit Logs"   val={stats.auditLogs}   />
+          </div>
+        </div>
+      </div>
+
+      {/* Demo Accounts */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Info size={16} style={{ color: 'var(--text-muted)' }} />
+            <span className="card-title">Demo Accounts</span>
+          </div>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead><tr><th>Role</th><th>Email</th><th>Password</th></tr></thead>
+            <tbody>
               {[
-                { role: 'Employee', email: 'employee@test.com', password: 'employee' },
-                { role: 'Manager', email: 'manager@test.com', password: 'manager' },
-                { role: 'Admin', email: 'admin@test.com', password: 'admin' },
-              ].map(acc => (
-                <tr key={acc.role}>
-                  <td className="py-3 px-4 font-medium text-gray-900">{acc.role}</td>
-                  <td className="py-3 px-4 text-gray-600 font-mono text-xs">{acc.email}</td>
-                  <td className="py-3 px-4 text-gray-600 font-mono text-xs">{acc.password}</td>
+                { role: 'Employee', email: 'employee@test.com', pw: 'employee' },
+                { role: 'Manager',  email: 'manager@test.com',  pw: 'manager'  },
+                { role: 'Admin',    email: 'admin@test.com',    pw: 'admin'    },
+              ].map(a => (
+                <tr key={a.role}>
+                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>{a.role}</td>
+                  <td><code style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--surface-raised)', padding: '2px 6px', borderRadius: 3 }}>{a.email}</code></td>
+                  <td><code style={{ fontSize: 12, color: 'var(--text-secondary)', background: 'var(--surface-raised)', padding: '2px 6px', borderRadius: 3 }}>{a.pw}</code></td>
                 </tr>
               ))}
             </tbody>
@@ -149,27 +135,26 @@ export function Settings() {
       </div>
 
       {/* System Info */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <CheckCircle2 size={18} className="text-emerald-500" />
-          System Info
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-            <span className="text-gray-500">Frontend</span>
-            <span className="font-medium text-gray-900">React 19 + Vite</span>
+      <div className="card">
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <CheckCircle2 size={16} style={{ color: 'var(--green)' }} />
+            <span className="card-title">System Info</span>
           </div>
-          <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-            <span className="text-gray-500">Backend</span>
-            <span className="font-medium text-gray-900">Supabase (PostgreSQL)</span>
-          </div>
-          <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-            <span className="text-gray-500">Styling</span>
-            <span className="font-medium text-gray-900">Tailwind CSS v4</span>
-          </div>
-          <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
-            <span className="text-gray-500">Charts</span>
-            <span className="font-medium text-gray-900">Recharts</span>
+        </div>
+        <div className="card-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {[
+              { k: 'Frontend',  v: 'React 19 + Vite'        },
+              { k: 'Backend',   v: 'Supabase (PostgreSQL)'   },
+              { k: 'Styling',   v: 'Tailwind CSS v4'         },
+              { k: 'Charts',    v: 'Recharts'                },
+            ].map(row => (
+              <div key={row.k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--surface-raised)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{row.k}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{row.v}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
