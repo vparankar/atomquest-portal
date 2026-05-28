@@ -116,11 +116,11 @@ function CycleManagement() {
 
       // ── Step 2: Set departments & manager assignments on profiles ──
       const profileUpdates = [
-        { id: employeeProfile.id, full_name: 'Alice Johnson', department: 'Engineering', manager_id: managerProfile.id },
-        { id: managerProfile.id, full_name: 'Bob Smith', department: 'Engineering', manager_id: null },
+        { id: employeeProfile.id, full_name: 'Priya Sharma', department: 'Product Engineering', manager_id: managerProfile.id },
+        { id: managerProfile.id, full_name: 'Rajesh Nair', department: 'Product Engineering', manager_id: null },
       ];
       if (adminProfile) {
-        profileUpdates.push({ id: adminProfile.id, full_name: 'Carol Admin', department: 'Operations', manager_id: null });
+        profileUpdates.push({ id: adminProfile.id, full_name: 'Anita Desai', department: 'People & Operations', manager_id: null });
       }
 
       for (const upd of profileUpdates) {
@@ -131,11 +131,11 @@ function CycleManagement() {
         }).eq('id', upd.id);
       }
 
-      // ── Step 3: Create cycles for 2026 (idempotent) ──
+      // ── Step 3: Create cycles for 2026 — Q2 is active (current quarter) ──
       const cycleDefinitions = [
         { year: 2026, phase: 'goal_setting' as const, opens_at: '2025-12-01', closes_at: '2025-12-31', is_active: false },
-        { year: 2026, phase: 'q1' as const, opens_at: '2026-01-01', closes_at: '2026-03-31', is_active: true },
-        { year: 2026, phase: 'q2' as const, opens_at: '2026-04-01', closes_at: '2026-06-30', is_active: false },
+        { year: 2026, phase: 'q1' as const, opens_at: '2026-01-01', closes_at: '2026-03-31', is_active: false },
+        { year: 2026, phase: 'q2' as const, opens_at: '2026-04-01', closes_at: '2026-06-30', is_active: true },
         { year: 2026, phase: 'q3' as const, opens_at: '2026-07-01', closes_at: '2026-09-30', is_active: false },
         { year: 2026, phase: 'q4' as const, opens_at: '2026-10-01', closes_at: '2026-12-31', is_active: false },
       ];
@@ -161,85 +161,103 @@ function CycleManagement() {
         }
       }
 
-      const activeCycleId = cycleIds['q1'];
+      const q2CycleId = cycleIds['q2'];
 
-      // ── Step 4: Seed goal sheets, goals, and achievements for each employee ──
+      // ── Step 4: Seed goal sheets & goals for Q2 (active cycle) ──
       const employees = allProfiles.filter(p => p.role === 'employee' || p.role === 'manager');
 
-      const goalTemplates = [
-        { thrust_area: 'Revenue', title: 'Increase Q1 Sales Revenue by 15%', uom_type: 'min' as const, target_value: 1000000, weightage: 25 },
-        { thrust_area: 'Customer', title: 'Achieve NPS Score of 80+', uom_type: 'min' as const, target_value: 80, weightage: 20 },
-        { thrust_area: 'Process', title: 'Complete Compliance Training', uom_type: 'timeline' as const, target_date: '2026-03-15', weightage: 15 },
-        { thrust_area: 'Quality', title: 'Reduce Bug Escape Rate Below 5%', uom_type: 'max' as const, target_value: 5, weightage: 15 },
-        { thrust_area: 'People', title: 'Mentor 2 Junior Team Members', uom_type: 'min' as const, target_value: 2, weightage: 15 },
-        { thrust_area: 'Cost', title: 'Cut Infrastructure Costs by 10%', uom_type: 'min' as const, target_value: 10, weightage: 10 },
+      // Role-specific goal templates — employee vs manager get different goals
+      const employeeGoalTemplates = [
+        { thrust_area: 'Revenue', title: 'Drive Smart Fan SKU Revenue to ₹12Cr', description: 'Expand the Efficio and Renesa Pro product lines across Tier-2 markets, focusing on dealer activations and Amazon A+ listings.', uom_type: 'min' as const, target_value: 12, weightage: 25 },
+        { thrust_area: 'Customer', title: 'Achieve Product NPS of 75+', description: 'Improve after-sales service response time, resolve warranty claims within 48 hours, and implement customer feedback loops.', uom_type: 'min' as const, target_value: 75, weightage: 20 },
+        { thrust_area: 'Process', title: 'Deliver IoT Hub Firmware v3.0', description: 'Complete the BLE mesh networking module and OTA update mechanism for the Atomberg IoT ecosystem by end of Q2.', uom_type: 'timeline' as const, target_date: '2026-06-15', weightage: 20 },
+        { thrust_area: 'Quality', title: 'Reduce Field Return Rate Below 2%', description: 'Implement automated end-of-line testing for BLDC motor assemblies and tighten incoming QC for PCB batches.', uom_type: 'max' as const, target_value: 2, weightage: 15 },
+        { thrust_area: 'People', title: 'Mentor 2 Graduate Trainees', description: 'Onboard and mentor new campus hires on the embedded firmware team through structured 90-day learning paths.', uom_type: 'min' as const, target_value: 2, weightage: 10 },
+        { thrust_area: 'Cost', title: 'Reduce Cloud Hosting Costs by 15%', description: 'Migrate telemetry pipelines to reserved instances, implement auto-scaling, and archive cold data to S3 Glacier.', uom_type: 'min' as const, target_value: 15, weightage: 10 },
       ];
 
-      // Achievement data per quarter — varied scores for realistic analytics
-      const achievementSets: Record<string, { score: number; status: string; actual_value?: number; actual_date?: string }[]> = {
-        q1: [
-          { score: 85, status: 'on_track', actual_value: 850000 },
-          { score: 78, status: 'on_track', actual_value: 78 },
-          { score: 100, status: 'completed', actual_date: '2026-03-10' },
-          { score: 60, status: 'on_track', actual_value: 8 },
-          { score: 50, status: 'on_track', actual_value: 1 },
-          { score: 70, status: 'on_track', actual_value: 7 },
-        ],
-        q2: [
-          { score: 92, status: 'on_track', actual_value: 920000 },
-          { score: 82, status: 'on_track', actual_value: 82 },
-          { score: 100, status: 'completed', actual_date: '2026-03-10' },
-          { score: 80, status: 'on_track', actual_value: 4 },
-          { score: 100, status: 'completed', actual_value: 2 },
-          { score: 85, status: 'on_track', actual_value: 8.5 },
-        ],
-        q3: [
-          { score: 70, status: 'on_track', actual_value: 700000 },
-          { score: 88, status: 'on_track', actual_value: 88 },
-          { score: 100, status: 'completed', actual_date: '2026-03-10' },
-          { score: 90, status: 'on_track', actual_value: 3 },
-          { score: 100, status: 'completed', actual_value: 2 },
-          { score: 95, status: 'completed', actual_value: 9.5 },
-        ],
-        q4: [
-          { score: 105, status: 'completed', actual_value: 1050000 },
-          { score: 90, status: 'completed', actual_value: 90 },
-          { score: 100, status: 'completed', actual_date: '2026-03-10' },
-          { score: 100, status: 'completed', actual_value: 2 },
-          { score: 100, status: 'completed', actual_value: 2 },
-          { score: 100, status: 'completed', actual_value: 10 },
-        ],
-      };
+      const managerGoalTemplates = [
+        { thrust_area: 'Revenue', title: 'Grow Engineering-Led Revenue to ₹45Cr', description: 'Deliver 3 new product variants (mixer grinder, water heater smart) and support GTM with technical demos and channel training.', uom_type: 'min' as const, target_value: 45, weightage: 25 },
+        { thrust_area: 'Customer', title: 'Maintain Support SLA at 95%+', description: 'Ensure the engineering support team resolves L2/L3 escalations within committed timelines and maintains CSAT above target.', uom_type: 'min' as const, target_value: 95, weightage: 15 },
+        { thrust_area: 'Process', title: 'Launch CI/CD Pipeline for Firmware', description: 'Implement automated build, test, and deploy pipelines for all embedded firmware repositories using GitHub Actions and hardware-in-the-loop testing.', uom_type: 'timeline' as const, target_date: '2026-05-31', weightage: 20 },
+        { thrust_area: 'Quality', title: 'Achieve Zero Critical Bugs in Production', description: 'Implement static analysis gates, mandatory code reviews, and staging environment validation for all firmware releases.', uom_type: 'zero' as const, target_value: 0, weightage: 15 },
+        { thrust_area: 'People', title: 'Build Team Capacity to 12 Engineers', description: 'Hire 4 senior embedded/IoT engineers, conduct structured onboarding, and achieve less than 10% attrition in the engineering team.', uom_type: 'min' as const, target_value: 12, weightage: 15 },
+        { thrust_area: 'Cost', title: 'Optimize Lab & Prototyping Budget', description: 'Reduce prototyping cycle costs by 20% through 3D printing in-house, negotiating better rates with PCB vendors, and reusing test jigs.', uom_type: 'min' as const, target_value: 20, weightage: 10 },
+      ];
+
+      // Q1 completed achievement data (historical)
+      const q1Achievements_employee = [
+        { score: 88, status: 'completed' as const, actual_value: 10.5 },
+        { score: 72, status: 'on_track' as const, actual_value: 72 },
+        { score: 100, status: 'completed' as const, actual_date: '2026-03-12' },
+        { score: 75, status: 'on_track' as const, actual_value: 3.2 },
+        { score: 50, status: 'on_track' as const, actual_value: 1 },
+        { score: 60, status: 'on_track' as const, actual_value: 9 },
+      ];
+
+      const q1Achievements_manager = [
+        { score: 82, status: 'on_track' as const, actual_value: 37 },
+        { score: 93, status: 'completed' as const, actual_value: 93 },
+        { score: 100, status: 'completed' as const, actual_date: '2026-03-28' },
+        { score: 100, status: 'completed' as const, actual_value: 0 },
+        { score: 75, status: 'on_track' as const, actual_value: 9 },
+        { score: 65, status: 'on_track' as const, actual_value: 13 },
+      ];
+
+      // Q2 in-progress achievement data (current quarter)
+      const q2Achievements_employee = [
+        { score: 45, status: 'on_track' as const, actual_value: 5.4 },
+        { score: 68, status: 'on_track' as const, actual_value: 68 },
+        { score: 0, status: 'not_started' as const },
+        { score: 80, status: 'on_track' as const, actual_value: 2.5 },
+        { score: 100, status: 'completed' as const, actual_value: 2 },
+        { score: 40, status: 'on_track' as const, actual_value: 6 },
+      ];
+
+      const q2Achievements_manager = [
+        { score: 38, status: 'on_track' as const, actual_value: 17 },
+        { score: 96, status: 'completed' as const, actual_value: 96 },
+        { score: 100, status: 'completed' as const, actual_date: '2026-05-20' },
+        { score: 100, status: 'completed' as const, actual_value: 0 },
+        { score: 83, status: 'on_track' as const, actual_value: 10 },
+        { score: 50, status: 'on_track' as const, actual_value: 10 },
+      ];
 
       let seededCount = 0;
       for (const emp of employees) {
-        // Check if goal sheet already exists for this cycle
+        const isManager = emp.role === 'manager';
+        const templates = isManager ? managerGoalTemplates : employeeGoalTemplates;
+        const q1Ach = isManager ? q1Achievements_manager : q1Achievements_employee;
+        const q2Ach = isManager ? q2Achievements_manager : q2Achievements_employee;
+
+        // Check if goal sheet already exists for Q2
         const { data: existingSheet } = await supabase
           .from('goal_sheets').select('id')
-          .eq('employee_id', emp.id).eq('cycle_id', activeCycleId)
+          .eq('employee_id', emp.id).eq('cycle_id', q2CycleId)
           .maybeSingle();
 
         if (existingSheet) continue;
 
-        // Create goal sheet
+        // Create goal sheet for Q2 (active cycle)
         const { data: newSheet, error: sheetErr } = await supabase
           .from('goal_sheets')
           .insert({
             employee_id: emp.id,
-            cycle_id: activeCycleId,
+            cycle_id: q2CycleId,
             status: 'approved',
-            submitted_at: new Date().toISOString(),
-            approved_at: new Date().toISOString(),
+            submitted_at: '2026-04-02T10:00:00Z',
+            approved_at: '2026-04-03T14:30:00Z',
           })
           .select().single();
 
         if (sheetErr) throw sheetErr;
 
         // Create goals
-        const goalsToInsert = goalTemplates.map(gt => ({
+        const goalsToInsert = templates.map(gt => ({
           sheet_id: newSheet.id,
           thrust_area: gt.thrust_area,
           title: gt.title,
+          description: gt.description,
           uom_type: gt.uom_type,
           target_value: gt.target_value ?? null,
           target_date: ('target_date' in gt) ? gt.target_date : null,
@@ -252,26 +270,38 @@ function CycleManagement() {
 
         if (goalsErr) throw goalsErr;
 
-        // Create achievements for each goal across all 4 quarters
+        // Create achievements for Q1 (historical) and Q2 (current/in-progress)
         const achievementsToInsert: any[] = [];
-        for (const phase of ['q1', 'q2', 'q3', 'q4']) {
-          const phaseAch = achievementSets[phase];
-          insertedGoals.forEach((goal: any, i: number) => {
-            const achData = phaseAch[i];
-            achievementsToInsert.push({
-              goal_id: goal.id,
-              cycle_phase: phase,
-              status: achData.status,
-              score: achData.score,
-              actual_value: achData.actual_value ?? null,
-              actual_date: achData.actual_date ?? null,
-              manager_comment: phase === 'q1' ? 'Good start to the year.' :
-                phase === 'q2' ? 'Strong mid-year progress.' :
-                phase === 'q3' ? 'Keep the momentum going.' :
-                'Excellent year-end performance!',
-            });
+
+        // Q1 achievements — completed quarter
+        insertedGoals.forEach((goal: any, i: number) => {
+          const achData = q1Ach[i];
+          achievementsToInsert.push({
+            goal_id: goal.id,
+            cycle_phase: 'q1',
+            status: achData.status,
+            score: achData.score,
+            actual_value: achData.actual_value ?? null,
+            actual_date: ('actual_date' in achData) ? achData.actual_date : null,
+            manager_comment: isManager ? 'Solid Q1 leadership. Team velocity improved.' : 'Good Q1 execution. Keep pushing on deliverables.',
           });
-        }
+        });
+
+        // Q2 achievements — current quarter (in-progress)
+        insertedGoals.forEach((goal: any, i: number) => {
+          const achData = q2Ach[i];
+          achievementsToInsert.push({
+            goal_id: goal.id,
+            cycle_phase: 'q2',
+            status: achData.status,
+            score: achData.score,
+            actual_value: achData.actual_value ?? null,
+            actual_date: ('actual_date' in achData) ? achData.actual_date : null,
+            manager_comment: achData.status === 'completed' ? 'Well done, target achieved ahead of schedule.'
+              : achData.status === 'on_track' ? 'On track — review progress in the next sync.'
+                : '',
+          });
+        });
 
         await supabase.from('achievements').insert(achievementsToInsert);
         seededCount++;
@@ -279,14 +309,14 @@ function CycleManagement() {
 
       // ── Step 5: Add audit log entries ──
       const auditEntries = [
-        { entity_type: 'goal_sheet', action: 'SEED_DEMO_DATA', changed_by: adminProfile?.id || employeeProfile.id, new_value: { seeded_employees: seededCount } },
-        { entity_type: 'cycles', action: 'CYCLE_CREATED', changed_by: adminProfile?.id || employeeProfile.id, new_value: { year: 2026, phases: 'goal_setting, q1, q2, q3, q4' } },
-        { entity_type: 'profiles', action: 'PROFILES_UPDATED', changed_by: adminProfile?.id || employeeProfile.id, new_value: { departments_set: true, managers_assigned: true } },
+        { entity_type: 'goal_sheet', action: 'SEED_DEMO_DATA', changed_by: adminProfile?.id || employeeProfile.id, new_value: { seeded_employees: seededCount, active_cycle: 'Q2 2026' } },
+        { entity_type: 'cycles', action: 'CYCLE_CREATED', changed_by: adminProfile?.id || employeeProfile.id, new_value: { year: 2026, phases: 'goal_setting, q1, q2, q3, q4', active: 'q2' } },
+        { entity_type: 'profiles', action: 'PROFILES_UPDATED', changed_by: adminProfile?.id || employeeProfile.id, new_value: { departments: ['Product Engineering', 'People & Operations'], managers_assigned: true } },
       ];
       await supabase.from('audit_logs').insert(auditEntries);
 
       if (seededCount > 0) {
-        toast.success(`Seeded ${seededCount} employees with 6 goals each, achievements across all 4 quarters, and 5 cycles!`);
+        toast.success(`Seeded ${seededCount} employee(s) with 6 goals each, Q1 + Q2 achievements, and Q2 as the active cycle!`);
       } else {
         toast.success('Demo data already exists — no duplicates created.');
       }
