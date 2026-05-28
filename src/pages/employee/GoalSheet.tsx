@@ -317,8 +317,10 @@ export function GoalSheet() {
               padding: '14px 20px', borderBottom: '1px solid var(--border)',
               background: 'var(--surface-raised)',
             }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Goal {index + 1}</h3>
-              {!isReadOnly && goals.length > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Goal {index + 1}</h3>
+              </div>
+              {!isReadOnly && goals.length > 1 && !(goal.is_shared || goal.shared_from) && (
                 <button
                   onClick={() => removeGoal(index)}
                   className="btn btn-danger btn-sm"
@@ -337,11 +339,11 @@ export function GoalSheet() {
                 <div>
                   <label className="form-label">Thrust Area</label>
                   <select
-                    disabled={isReadOnly}
+                    disabled={isReadOnly || !!(goal.is_shared || goal.shared_from)}
                     value={goal.thrust_area || ''}
                     onChange={e => updateGoal(index, 'thrust_area', e.target.value)}
                     className="form-select"
-                    style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                    style={(isReadOnly || !!(goal.is_shared || goal.shared_from)) ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
                   >
                     {THRUST_AREAS.map(ta => <option key={ta} value={ta}>{ta}</option>)}
                   </select>
@@ -366,12 +368,12 @@ export function GoalSheet() {
                 <label className="form-label">Goal Title</label>
                 <input
                   type="text"
-                  disabled={isReadOnly}
+                  disabled={isReadOnly || !!(goal.is_shared || goal.shared_from)}
                   value={goal.title || ''}
                   onChange={e => updateGoal(index, 'title', e.target.value)}
                   className="form-input"
                   placeholder="E.g., Increase Q3 Sales Revenue"
-                  style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                  style={(isReadOnly || !!(goal.is_shared || goal.shared_from)) ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
                 />
               </div>
 
@@ -379,12 +381,12 @@ export function GoalSheet() {
               <div style={{ marginBottom: 16 }}>
                 <label className="form-label">Description (Optional)</label>
                 <textarea
-                  disabled={isReadOnly}
+                  disabled={isReadOnly || !!(goal.is_shared || goal.shared_from)}
                   value={goal.description || ''}
                   onChange={e => updateGoal(index, 'description', e.target.value)}
                   rows={2}
                   className="form-textarea"
-                  style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                  style={(isReadOnly || !!(goal.is_shared || goal.shared_from)) ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
                 />
               </div>
 
@@ -393,11 +395,11 @@ export function GoalSheet() {
                 <div>
                   <label className="form-label">Unit of Measurement</label>
                   <select
-                    disabled={isReadOnly}
+                    disabled={isReadOnly || !!(goal.is_shared || goal.shared_from)}
                     value={goal.uom_type || 'min'}
                     onChange={e => updateGoal(index, 'uom_type', e.target.value)}
                     className="form-select"
-                    style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                    style={(isReadOnly || !!(goal.is_shared || goal.shared_from)) ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
                   >
                     {UOM_TYPES.map(uom => <option key={uom.value} value={uom.value}>{uom.label}</option>)}
                   </select>
@@ -408,20 +410,20 @@ export function GoalSheet() {
                   {goal.uom_type === 'timeline' ? (
                     <input
                       type="date"
-                      disabled={isReadOnly}
+                      disabled={isReadOnly || !!(goal.is_shared || goal.shared_from)}
                       value={goal.target_date || ''}
                       onChange={e => updateGoal(index, 'target_date', e.target.value)}
                       className="form-input"
-                      style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                      style={(isReadOnly || !!(goal.is_shared || goal.shared_from)) ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
                     />
                   ) : (
                     <input
                       type="number"
-                      disabled={isReadOnly}
+                      disabled={isReadOnly || !!(goal.is_shared || goal.shared_from)}
                       value={goal.target_value !== undefined ? goal.target_value : ''}
                       onChange={e => updateGoal(index, 'target_value', parseFloat(e.target.value))}
                       className="form-input"
-                      style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                      style={(isReadOnly || !!(goal.is_shared || goal.shared_from)) ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
                     />
                   )}
                 </div>

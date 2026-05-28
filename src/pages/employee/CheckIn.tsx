@@ -294,7 +294,9 @@ export function CheckIn() {
                 <span className="badge badge-gray" style={{ marginBottom: 6, display: 'inline-block' }}>
                   {goal.thrust_area}
                 </span>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{goal.title}</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                  {goal.title}
+                </h3>
                 {goal.description && (
                   <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{goal.description}</p>
                 )}

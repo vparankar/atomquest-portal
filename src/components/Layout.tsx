@@ -71,6 +71,8 @@ export function Layout() {
       { name: 'Dashboard', path: '/manager', icon: Home },
       { name: 'Team Goals', path: '/manager/team', icon: Users },
       { name: 'Reviews', path: '/manager/reviews', icon: FileText },
+      { name: 'My Goals', path: '/manager/goals', icon: FileText },
+      { name: 'Check-In', path: '/manager/checkin', icon: BarChart3 },
       { name: 'Profile', path: '/manager/profile', icon: UserCircle },
     ];
   } else {

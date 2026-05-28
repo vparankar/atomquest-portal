@@ -144,7 +144,9 @@ export function CheckInReview() {
                                 {member.goals.map(goal => (
                                   <tr key={goal.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                     <td style={{ padding: '10px 14px', width: '22%' }}>
-                                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{goal.title}</div>
+                                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                                        {goal.title}
+                                      </div>
                                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{goal.thrust_area}</div>
                                     </td>
                                     <td style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>

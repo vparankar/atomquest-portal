@@ -203,6 +203,25 @@ function CycleManagement() {
 
       const q2CycleId = cycleIds['q2'];
 
+      // ── Step 3.5: Create a master shared goal ──
+      let sharedMasterGoalId: string | null = null;
+      const { data: existingMaster } = await supabase.from('goals').select('id').eq('is_shared', true).eq('title', 'Company-Wide Cost Optimization').maybeSingle();
+      if (existingMaster) {
+        sharedMasterGoalId = existingMaster.id;
+      } else {
+        const { data: newMaster, error: masterErr } = await supabase.from('goals').insert({
+          thrust_area: 'Cost',
+          title: 'Company-Wide Cost Optimization',
+          description: 'Reduce overall operational expenditures by 10% across all departments through resource optimization.',
+          uom_type: 'min',
+          target_value: 10,
+          status: 'not_started',
+          is_shared: true,
+        }).select().single();
+        if (masterErr) throw masterErr;
+        sharedMasterGoalId = newMaster.id;
+      }
+
       // ── Step 4: Seed goal sheets & goals for Q2 (active cycle) ──
       const employees = allProfiles.filter(p => p.role === 'employee' || p.role === 'manager');
 
@@ -213,7 +232,7 @@ function CycleManagement() {
         { thrust_area: 'Process', title: 'Deliver IoT Hub Firmware v3.0', description: 'Complete the BLE mesh networking module and OTA update mechanism for the Atomberg IoT ecosystem by end of Q2.', uom_type: 'timeline' as const, target_date: '2026-06-15', weightage: 20 },
         { thrust_area: 'Quality', title: 'Reduce Field Return Rate Below 2%', description: 'Implement automated end-of-line testing for BLDC motor assemblies and tighten incoming QC for PCB batches.', uom_type: 'max' as const, target_value: 2, weightage: 15 },
         { thrust_area: 'People', title: 'Mentor 2 Graduate Trainees', description: 'Onboard and mentor new campus hires on the embedded firmware team through structured 90-day learning paths.', uom_type: 'min' as const, target_value: 2, weightage: 10 },
-        { thrust_area: 'Cost', title: 'Reduce Cloud Hosting Costs by 15%', description: 'Migrate telemetry pipelines to reserved instances, implement auto-scaling, and archive cold data to S3 Glacier.', uom_type: 'min' as const, target_value: 15, weightage: 10 },
+        { thrust_area: 'Cost', title: 'Company-Wide Cost Optimization', description: 'Reduce overall operational expenditures by 10% across all departments through resource optimization.', uom_type: 'min' as const, target_value: 10, weightage: 10, is_shared: true },
       ];
 
       const managerGoalTemplates = [
@@ -222,7 +241,7 @@ function CycleManagement() {
         { thrust_area: 'Process', title: 'Launch CI/CD Pipeline for Firmware', description: 'Implement automated build, test, and deploy pipelines for all embedded firmware repositories using GitHub Actions and hardware-in-the-loop testing.', uom_type: 'timeline' as const, target_date: '2026-05-31', weightage: 20 },
         { thrust_area: 'Quality', title: 'Achieve Zero Critical Bugs in Production', description: 'Implement static analysis gates, mandatory code reviews, and staging environment validation for all firmware releases.', uom_type: 'zero' as const, target_value: 0, weightage: 15 },
         { thrust_area: 'People', title: 'Build Team Capacity to 12 Engineers', description: 'Hire 4 senior embedded/IoT engineers, conduct structured onboarding, and achieve less than 10% attrition in the engineering team.', uom_type: 'min' as const, target_value: 12, weightage: 15 },
-        { thrust_area: 'Cost', title: 'Optimize Lab & Prototyping Budget', description: 'Reduce prototyping cycle costs by 20% through 3D printing in-house, negotiating better rates with PCB vendors, and reusing test jigs.', uom_type: 'min' as const, target_value: 20, weightage: 10 },
+        { thrust_area: 'Cost', title: 'Company-Wide Cost Optimization', description: 'Reduce overall operational expenditures by 10% across all departments through resource optimization.', uom_type: 'min' as const, target_value: 10, weightage: 10, is_shared: true },
       ];
 
       // Q1 completed achievement data (historical)
@@ -232,7 +251,7 @@ function CycleManagement() {
         { score: 100, status: 'completed' as const, actual_date: '2026-03-12' },
         { score: 75, status: 'on_track' as const, actual_value: 3.2 },
         { score: 50, status: 'on_track' as const, actual_value: 1 },
-        { score: 60, status: 'on_track' as const, actual_value: 9 },
+        { score: 90, status: 'on_track' as const, actual_value: 9 },
       ];
 
       const q1Achievements_manager = [
@@ -241,7 +260,7 @@ function CycleManagement() {
         { score: 100, status: 'completed' as const, actual_date: '2026-03-28' },
         { score: 100, status: 'completed' as const, actual_value: 0 },
         { score: 75, status: 'on_track' as const, actual_value: 9 },
-        { score: 65, status: 'on_track' as const, actual_value: 13 },
+        { score: 100, status: 'completed' as const, actual_value: 13 },
       ];
 
       // Q2 in-progress achievement data (current quarter)
@@ -251,7 +270,7 @@ function CycleManagement() {
         { score: 0, status: 'not_started' as const },
         { score: 80, status: 'on_track' as const, actual_value: 2.5 },
         { score: 100, status: 'completed' as const, actual_value: 2 },
-        { score: 40, status: 'on_track' as const, actual_value: 6 },
+        { score: 60, status: 'on_track' as const, actual_value: 6 },
       ];
 
       const q2Achievements_manager = [
@@ -260,7 +279,7 @@ function CycleManagement() {
         { score: 100, status: 'completed' as const, actual_date: '2026-05-20' },
         { score: 100, status: 'completed' as const, actual_value: 0 },
         { score: 83, status: 'on_track' as const, actual_value: 10 },
-        { score: 50, status: 'on_track' as const, actual_value: 10 },
+        { score: 100, status: 'completed' as const, actual_value: 10 },
       ];
 
       let seededCount = 0;
@@ -303,6 +322,8 @@ function CycleManagement() {
           target_date: ('target_date' in gt) ? gt.target_date : null,
           weightage: gt.weightage,
           status: 'on_track' as const,
+          is_shared: ('is_shared' in gt) ? gt.is_shared : false,
+          shared_from: ('is_shared' in gt && gt.is_shared) ? sharedMasterGoalId : null,
         }));
 
         const { data: insertedGoals, error: goalsErr } = await supabase
@@ -612,7 +633,6 @@ function SharedGoals() {
         target_date: uomType === 'timeline' ? target : null,
         status: 'not_started',
         is_shared: true,
-        weightage: 0,
       })
       .select()
       .single();
@@ -638,12 +658,13 @@ function SharedGoals() {
     const promises = selectedEmployees.map(async (empId) => {
       let { data: sheet } = await supabase
         .from('goal_sheets')
-        .select('id')
+        .select('id, status')
         .eq('employee_id', empId)
         .eq('cycle_id', activeCycle.id)
         .maybeSingle();
 
       let sheetId = sheet?.id;
+      let sheetStatus = sheet?.status;
 
       if (!sheetId) {
         const { data: newSheet } = await supabase
@@ -652,6 +673,8 @@ function SharedGoals() {
           .select()
           .single();
         sheetId = newSheet?.id;
+      } else if (sheetStatus === 'submitted' || sheetStatus === 'approved') {
+        await supabase.from('goal_sheets').update({ status: 'draft', manager_comment: 'Sheet unlocked due to new shared goal assignment. Please adjust weightages and resubmit.' }).eq('id', sheetId);
       }
 
       if (sheetId) {
@@ -664,8 +687,8 @@ function SharedGoals() {
           target_value: uomType !== 'timeline' ? Number(target) : null,
           target_date: uomType === 'timeline' ? target : null,
           status: 'not_started',
+          is_shared: true,
           shared_from: masterGoal.id,
-          weightage: 0,
         });
       }
     });
