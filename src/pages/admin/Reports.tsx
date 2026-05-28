@@ -74,6 +74,19 @@ function AchievementReport() {
 
   const handleExport = () => {
     const ws = XLSX.utils.json_to_sheet(rows.map(r => ({ 'Employee': r.employeeName, 'Dept': r.department, 'Goal': r.goalTitle, 'Thrust': r.thrustArea, 'UoM': r.uomType, 'Target': r.target, 'Q1 Actual': r.q1Actual, 'Q2 Actual': r.q2Actual, 'Q3 Actual': r.q3Actual, 'Q4 Actual': r.q4Actual, 'Q1%': r.q1Score, 'Q2%': r.q2Score, 'Q3%': r.q3Score, 'Q4%': r.q4Score, 'Status': r.status })));
+    
+    ws['!cols'] = [
+      { wch: 25 }, // Employee
+      { wch: 25 }, // Dept
+      { wch: 45 }, // Goal Title
+      { wch: 15 }, // Thrust Area
+      { wch: 10 }, // UoM
+      { wch: 15 }, // Target
+      { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, // Q1-Q4 Actuals
+      { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, // Q1-Q4 Scores
+      { wch: 15 }  // Status
+    ];
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Achievement Report');
     XLSX.writeFile(wb, 'achievement_report.xlsx');

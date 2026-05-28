@@ -4,6 +4,8 @@ import { useAuth } from '../../hooks/useAuth';
 import type { Cycle, Profile } from '../../types';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
+import * as XLSX from 'xlsx';
+import { Download } from 'lucide-react';
 
 export function AdminPanel() {
   const { user } = useAuth();
@@ -50,6 +52,7 @@ export function AdminPanel() {
 function CycleManagement() {
   const [cycles, setCycles] = useState<Cycle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [year, setYear] = useState(new Date().getFullYear());
   const [phase, setPhase] = useState<Cycle['phase']>('goal_setting');
@@ -72,25 +75,70 @@ function CycleManagement() {
     setLoading(false);
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const { error } = await supabase.from('cycles').insert({
-      year,
-      phase,
-      opens_at: opensAt,
-      closes_at: closesAt,
-      is_active: false,
-    });
-    setIsSubmitting(false);
-    if (!error) {
-      setOpensAt('');
-      setClosesAt('');
-      fetchCycles();
-      toast.success('Cycle created successfully');
+    if (editingId) {
+      const { error } = await supabase.from('cycles').update({
+        year,
+        phase,
+        opens_at: opensAt,
+        closes_at: closesAt,
+      }).eq('id', editingId);
+      setIsSubmitting(false);
+      if (!error) {
+        handleCancelEdit();
+        fetchCycles();
+        toast.success('Cycle updated successfully');
+      } else {
+        toast.error('Error updating cycle: ' + error.message);
+      }
     } else {
-      toast.error('Error creating cycle: ' + error.message);
+      const { error } = await supabase.from('cycles').insert({
+        year,
+        phase,
+        opens_at: opensAt,
+        closes_at: closesAt,
+        is_active: false,
+      });
+      setIsSubmitting(false);
+      if (!error) {
+        setOpensAt('');
+        setClosesAt('');
+        fetchCycles();
+        toast.success('Cycle created successfully');
+      } else {
+        toast.error('Error creating cycle: ' + error.message);
+      }
     }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this cycle?')) return;
+    const { error } = await supabase.from('cycles').delete().eq('id', id);
+    if (!error) {
+      fetchCycles();
+      toast.success('Cycle deleted successfully');
+    } else {
+      toast.error('Error deleting cycle: ' + error.message);
+    }
+  };
+
+  const handleEdit = (cycle: Cycle) => {
+    setEditingId(cycle.id);
+    setYear(cycle.year);
+    setPhase(cycle.phase);
+    setOpensAt(cycle.opens_at ? cycle.opens_at.split('T')[0] : '');
+    setClosesAt(cycle.closes_at ? cycle.closes_at.split('T')[0] : '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setYear(new Date().getFullYear());
+    setPhase('goal_setting');
+    setOpensAt('');
+    setClosesAt('');
   };
 
   const handleSeedData = async () => {
@@ -340,8 +388,8 @@ function CycleManagement() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Create New Cycle</h2>
-      <form onSubmit={handleCreate} style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 28, alignItems: 'flex-end' }}>
+      <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>{editingId ? 'Edit Cycle' : 'Create New Cycle'}</h2>
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 28, alignItems: 'flex-end' }}>
         <div>
           <label className="form-label">Year</label>
           <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="form-input" required />
@@ -364,10 +412,15 @@ function CycleManagement() {
           <label className="form-label">Closes At</label>
           <input type="date" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} className="form-input" required />
         </div>
-        <div>
-          <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
-            {isSubmitting ? 'Creating…' : 'Create Cycle'}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ width: editingId ? 'auto' : '100%', flex: 1 }}>
+            {isSubmitting ? (editingId ? 'Updating…' : 'Creating…') : (editingId ? 'Update Cycle' : 'Create Cycle')}
           </button>
+          {editingId && (
+            <button type="button" onClick={handleCancelEdit} className="btn btn-secondary" style={{ flex: 1 }}>
+              Cancel
+            </button>
+          )}
         </div>
       </form>
 
@@ -405,13 +458,25 @@ function CycleManagement() {
                       {cycle.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right', display: 'flex', gap: 12, justifyContent: 'flex-end', alignItems: 'center', height: '100%', minHeight: 40 }}>
                     <button
                       onClick={() => handleToggleActive(cycle.id, cycle.is_active)}
                       disabled={cycle.is_active}
                       style={{ fontSize: 12, fontWeight: 500, color: cycle.is_active ? 'var(--text-muted)' : 'var(--brand-yellow-dark)', background: 'none', border: 'none', cursor: cycle.is_active ? 'default' : 'pointer' }}
                     >
                       Set Active
+                    </button>
+                    <button
+                      onClick={() => handleEdit(cycle)}
+                      style={{ fontSize: 12, fontWeight: 500, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(cycle.id)}
+                      style={{ fontSize: 12, fontWeight: 500, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>
@@ -747,87 +812,125 @@ function AuditLogViewer() {
     setLoading(false);
   };
 
+  const handleExport = () => {
+    const ws = XLSX.utils.json_to_sheet(logs.map(log => ({
+      'Time': new Date(log.changed_at || log.created_at).toLocaleString(),
+      'Actor': log.profiles?.full_name || log.changed_by,
+      'Action': log.action,
+      'Entity': log.entity_type,
+      'Entity ID': log.entity_id || '',
+      'Changes': JSON.stringify(log.new_value || log.details || {})
+    })));
+
+    ws['!cols'] = [
+      { wch: 20 }, // Time
+      { wch: 20 }, // Actor
+      { wch: 20 }, // Action
+      { wch: 15 }, // Entity
+      { wch: 30 }, // Entity ID
+      { wch: 50 }, // Changes
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Audit Log');
+    XLSX.writeFile(wb, 'audit_log.xlsx');
+    toast.success('Audit log exported successfully');
+  };
+
   return (
-    <div>
-      <div className="mb-4 flex flex-col md:flex-row gap-4">
+    <div className="card">
+      <div className="card-header" style={{ flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <label className="block text-xs font-medium text-gray-700">Entity Type</label>
-          <select
-            value={entityFilter}
-            onChange={(e) => setEntityFilter(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          >
-            <option value="">All Entities</option>
-            <option value="goal_sheet">Goal Sheet</option>
-            <option value="goals">Goals</option>
-            <option value="cycles">Cycles</option>
-          </select>
+          <div className="card-title">Audit Log</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{logs.length} record{logs.length !== 1 ? 's' : ''}</div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700">Start Date</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700">End Date</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          />
+
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div>
+            <label className="form-label" style={{ marginBottom: 4, fontSize: 11 }}>Entity Type</label>
+            <select
+              value={entityFilter}
+              onChange={(e) => setEntityFilter(e.target.value)}
+              className="form-select"
+              style={{ padding: '6px 10px', height: 34, minWidth: 140 }}
+            >
+              <option value="">All Entities</option>
+              <option value="goal_sheet">Goal Sheet</option>
+              <option value="goals">Goals</option>
+              <option value="cycles">Cycles</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label" style={{ marginBottom: 4, fontSize: 11 }}>Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="form-input"
+              style={{ padding: '6px 10px', height: 34 }}
+            />
+          </div>
+          <div>
+            <label className="form-label" style={{ marginBottom: 4, fontSize: 11 }}>End Date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="form-input"
+              style={{ padding: '6px 10px', height: 34 }}
+            />
+          </div>
+          <button onClick={handleExport} disabled={logs.length === 0} className="btn btn-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34 }}>
+            <Download size={14} /> Export to Excel
+          </button>
         </div>
       </div>
 
       {loading ? (
         <div className="py-8"><Spinner /></div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actor</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changes</th>
+                <th>Time</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Changes</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {logs.map((log) => (
                 <tr key={log.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
                     {new Date(log.changed_at || '').toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>
                     {log.profiles?.full_name || log.changed_by || 'System'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td style={{ fontWeight: 500 }}>
                     {log.action}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {log.entity_type} {log.entity_id ? `(${log.entity_id.slice(0, 8)}...)` : ''}
+                  <td style={{ color: 'var(--text-secondary)' }}>
+                    {log.entity_type} {log.entity_id ? <span style={{ fontSize: 11, fontFamily: 'monospace' }}>({log.entity_id.slice(0, 8)}...)</span> : ''}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
-                    <div className="text-xs space-y-1">
+                  <td style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 400 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {log.old_value && (
-                        <div><span className="font-medium text-gray-600">Old:</span> {JSON.stringify(log.old_value)}</div>
+                        <div><strong style={{ color: 'var(--text)' }}>Old:</strong> {JSON.stringify(log.old_value)}</div>
                       )}
                       {log.new_value && (
-                        <div><span className="font-medium text-gray-600">New:</span> {JSON.stringify(log.new_value)}</div>
+                        <div><strong style={{ color: 'var(--text)' }}>New:</strong> {JSON.stringify(log.new_value)}</div>
                       )}
-                      {!log.old_value && !log.new_value && <span className="italic text-gray-400">—</span>}
+                      {!log.old_value && !log.new_value && <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>—</span>}
                     </div>
                   </td>
                 </tr>
               ))}
               {logs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={5} style={{ padding: '48px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     No logs found.
                   </td>
                 </tr>
