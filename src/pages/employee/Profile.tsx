@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { Profile as ProfileType } from '../../types';
-import { UserCircle, Save, Mail, Shield, Users, CalendarDays } from 'lucide-react';
+import { UserCircle, Save, Mail, Shield, Users, CalendarDays, Eye, EyeOff } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
 
-const DEPTS = ['Engineering', 'Sales', 'Marketing', 'HR', 'Finance', 'Operations', 'Product'];
+const DEPTS = ['Product Engineering', 'People & Operations', 'Sales', 'Marketing', 'HR', 'Finance', 'Operations', 'Product'];
 
 export function Profile() {
   const { user } = useAuth();
@@ -16,6 +16,15 @@ export function Profile() {
   const [fullName, setFullName] = useState('');
   const [department, setDepartment] = useState('');
   const [managerName, setManagerName] = useState<string | null>(null);
+
+  // Password change state
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => { if (user) loadProfile(); }, [user?.id]);
@@ -45,6 +54,45 @@ export function Profile() {
   };
 
   const hasChanges = profile && (fullName !== (profile.full_name || '') || department !== (profile.department || ''));
+
+  const handleChangePassword = async () => {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      // Verify old password by re-authenticating
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user!.email!,
+        password: oldPassword,
+      });
+      if (signInError) {
+        toast.error('Current password is incorrect');
+        setChangingPassword(false);
+        return;
+      }
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast.success('Password updated successfully');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowOldPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+    } catch (err: any) {
+      toast.error('Failed to update password: ' + err.message);
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const canUpdatePassword = oldPassword.length > 0 && newPassword.length > 0 && confirmPassword.length > 0;
 
   if (loading) return <div style={{ padding: 32 }}><Spinner /></div>;
   if (!profile) return <div style={{ padding: 32, textAlign: 'center', color: 'var(--red)' }}>Could not load profile.</div>;
@@ -113,6 +161,89 @@ export function Profile() {
             <button onClick={handleSave} disabled={saving || !hasChanges} className="btn btn-primary" style={{ gap: 6 }}>
               <Save size={14} />
               {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Change Password */}
+      <div className="card" style={{ marginTop: 20 }}>
+        <div className="card-header"><span className="card-title">Change Password</span></div>
+        <div className="card-body">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label className="form-label">Current Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  type={showOldPassword ? 'text' : 'password'}
+                  value={oldPassword}
+                  onChange={e => setOldPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  style={{ paddingRight: 40 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowOldPassword(!showOldPassword)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  tabIndex={-1}
+                >
+                  {showOldPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="form-label">New Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  style={{ paddingRight: 40 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  tabIndex={-1}
+                >
+                  {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="form-label">Confirm New Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  style={{ paddingRight: 40 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={handleChangePassword}
+              disabled={changingPassword || !canUpdatePassword}
+              className="btn btn-primary"
+              style={{ gap: 6 }}
+            >
+              <Save size={14} />
+              {changingPassword ? 'Updating…' : 'Update Password'}
             </button>
           </div>
         </div>

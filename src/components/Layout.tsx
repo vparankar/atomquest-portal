@@ -70,6 +70,7 @@ export function Layout() {
       { name: 'Dashboard', path: '/manager', icon: Home },
       { name: 'Team Goals', path: '/manager/team', icon: Users },
       { name: 'Reviews', path: '/manager/reviews', icon: FileText },
+      { name: 'Profile', path: '/manager/profile', icon: UserCircle },
     ];
   } else {
     navItems = [
