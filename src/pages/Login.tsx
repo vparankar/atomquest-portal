@@ -68,7 +68,7 @@ export function Login() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="demo-accounts-list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
             { role: 'Employee', email: 'employee@test.com', pw: 'employee' },
             { role: 'Manager', email: 'manager@test.com', pw: 'manager' },

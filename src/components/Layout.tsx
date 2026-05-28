@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import {
   LogOut, Home, Settings, Users, FileText,
-  UserCircle, Loader2, BarChart3, PieChart,
+  UserCircle, Loader2, BarChart3, PieChart, Menu, X
 } from 'lucide-react';
 import atombergLogo from '../assets/atomberg.png';
 import '../index.css';
@@ -26,6 +26,7 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [switching, setSwitching] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -87,16 +88,30 @@ export function Layout() {
 
   return (
     <div className="layout-container">
-      <aside className="sidebar">
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         {/* Header */}
         <div className="sidebar-header">
           <div className="brand-mark" style={{ background: 'transparent', boxShadow: 'none' }}>
             <img src={atombergLogo} alt="Atomberg" style={{ height: 28, borderRadius: 6, display: 'block' }} />
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div className="brand-title">AtomQuest</div>
             <span className="brand-subtitle">by Atomberg</span>
           </div>
+          <button 
+            className="mobile-close-btn"
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Nav */}
@@ -115,6 +130,7 @@ export function Layout() {
                 key={item.path}
                 to={item.path}
                 className={`nav-item${isActive ? ' nav-item-active' : ''}`}
+                onClick={() => setIsSidebarOpen(false)}
               >
                 <Icon size={16} />
                 <span>{item.name}</span>
@@ -171,6 +187,22 @@ export function Layout() {
       </aside>
 
       <main className="main-content">
+        {/* Mobile Header */}
+        <div className="mobile-topbar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button 
+              className="hamburger-btn"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <div className="brand-mark" style={{ background: 'transparent', boxShadow: 'none', width: 24, height: 24 }}>
+              <img src={atombergLogo} alt="Atomberg" style={{ height: 24, borderRadius: 6, display: 'block' }} />
+            </div>
+            <div className="brand-title" style={{ color: 'var(--text)', fontSize: 16 }}>AtomQuest</div>
+          </div>
+        </div>
+
         <Outlet />
       </main>
     </div>

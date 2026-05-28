@@ -19,7 +19,8 @@ export function AdminPanel() {
       </div>
 
       <div className="card">
-        <div className="tab-nav" style={{ padding: '0 20px' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <div className="tab-nav" style={{ padding: '0 20px', minWidth: 'max-content' }}>
           {[
             { id: 'cycles', name: 'Cycle Management' },
             { id: 'unlock', name: 'Goal Unlock' },
@@ -34,6 +35,7 @@ export function AdminPanel() {
               {tab.name}
             </button>
           ))}
+          </div>
         </div>
 
         <div style={{ padding: 24 }}>
@@ -389,7 +391,7 @@ function CycleManagement() {
   return (
     <div>
       <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>{editingId ? 'Edit Cycle' : 'Create New Cycle'}</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 28, alignItems: 'flex-end' }}>
+      <form onSubmit={handleSubmit} className="cycle-form-grid">
         <div>
           <label className="form-label">Year</label>
           <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="form-input" required />
@@ -412,7 +414,7 @@ function CycleManagement() {
           <label className="form-label">Closes At</label>
           <input type="date" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} className="form-input" required />
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="mobile-stack-buttons">
           <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ width: editingId ? 'auto' : '100%', flex: 1 }}>
             {isSubmitting ? (editingId ? 'Updating…' : 'Creating…') : (editingId ? 'Update Cycle' : 'Create Cycle')}
           </button>
@@ -715,7 +717,7 @@ function SharedGoals() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+    <div className="shared-goals-grid">
       <div>
         <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Create Shared Goal</h2>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -731,7 +733,7 @@ function SharedGoals() {
             <label className="form-label">Description</label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="form-textarea" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="profile-form-grid">
             <div>
               <label className="form-label">UoM Type</label>
               <select value={uomType} onChange={(e) => setUomType(e.target.value)} className="form-select">

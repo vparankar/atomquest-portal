@@ -121,7 +121,7 @@ export function Profile() {
           </div>
 
           {/* Info grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 24 }}>
+          <div className="profile-form-grid" style={{ gap: 10, marginBottom: 24 }}>
             {[
               { icon: <Mail size={15} style={{ color: 'var(--text-muted)' }} />,         label: 'Email',         val: user?.email || '—'  },
               { icon: <Shield size={15} style={{ color: 'var(--text-muted)' }} />,       label: 'Role',          val: profile.role         },
