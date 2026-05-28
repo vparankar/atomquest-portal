@@ -14,6 +14,13 @@ const UOM_TYPES = [
   { value: "zero", label: "Zero (Zero = success)" }
 ];
 
+const statusBadge: Record<string, string> = {
+  approved:  'badge badge-green',
+  submitted: 'badge badge-blue',
+  rework:    'badge badge-amber',
+  draft:     'badge badge-gray',
+};
+
 export function GoalSheet() {
   const { user } = useAuth();
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
@@ -234,188 +241,226 @@ export function GoalSheet() {
   };
 
   if (loading) {
-    return <div className="p-8"><Spinner /></div>;
+    return <div style={{ padding: 32 }}><Spinner /></div>;
   }
 
   if (!activeCycle) {
-    return <div className="p-8 text-center text-red-500">No active cycle found.</div>;
+    return (
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 32px' }}>
+        <div className="alert alert-red">
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+          <span>No active cycle found.</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 32px' }}>
-      <div className="mb-8 flex justify-between items-center border-b border-slate-200 pb-4">
+      {/* ── Page Header ─────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 24,
+      }}>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">My Goals</h1>
-          <p className="text-slate-500 mt-1">Cycle: {activeCycle.year} - {activeCycle.phase.toUpperCase()}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>
+            My Goals
+          </h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+            Cycle: {activeCycle.year} - {activeCycle.phase.toUpperCase()}
+          </p>
         </div>
 
         {goalSheet && (
-          <div className="flex items-center space-x-2">
-            <span className={`px-3 py-1 rounded text-sm font-medium uppercase tracking-wider
-              ${goalSheet.status === 'approved' ? 'bg-green-100 text-green-700' :
-                goalSheet.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
-                  goalSheet.status === 'rework' ? 'bg-amber-100 text-amber-700' :
-                    'bg-slate-100 text-slate-700'}`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className={statusBadge[goalSheet.status] || 'badge badge-gray'}
+              style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
               {goalSheet.status}
             </span>
-            {isReadOnly && <Lock size={18} className="text-slate-400" />}
+            {isReadOnly && <Lock size={15} style={{ color: 'var(--text-muted)' }} />}
           </div>
         )}
       </div>
 
+      {/* ── Rework Alert ────────────────────────────────────────── */}
       {isRework && goalSheet?.manager_comment && (
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-md flex items-start">
-          <AlertCircle className="text-amber-500 mt-0.5 mr-3 flex-shrink-0" size={20} />
+        <div className="alert alert-amber" style={{ marginBottom: 20 }}>
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
           <div>
-            <h4 className="font-medium text-amber-800">Manager Comment (Rework)</h4>
-            <p className="text-amber-700 mt-1">{goalSheet.manager_comment}</p>
+            <strong style={{ display: 'block', marginBottom: 2 }}>Manager Comment (Rework)</strong>
+            <span>{goalSheet.manager_comment}</span>
           </div>
         </div>
       )}
 
-      <div className="space-y-6">
+      {/* ── Goals List ──────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {goals.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-lg border border-slate-200">
-            <p className="text-slate-500">No goals yet.</p>
+          <div className="card" style={{ padding: '48px 24px', textAlign: 'center' }}>
+            <div className="empty-state-icon">
+              <AlertCircle size={32} style={{ color: 'var(--border-strong)' }} />
+            </div>
+            <p className="empty-state-title">No goals yet.</p>
             {!isReadOnly && (
-              <button
-                onClick={addGoal}
-                className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
-              >
-                + Add your first goal
+              <button onClick={addGoal} className="btn btn-primary" style={{ marginTop: 16 }}>
+                <Plus size={15} /> Add your first goal
               </button>
             )}
           </div>
         )}
+
         {goals.map((goal, index) => (
-          <div key={index} className="bg-white border border-slate-200 rounded-md p-6 shadow-sm">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-medium text-slate-800">Goal {index + 1}</h3>
+          <div key={index} className="card" style={{ padding: 0 }}>
+            {/* Goal Card Header */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '14px 20px', borderBottom: '1px solid var(--border)',
+              background: 'var(--surface-raised)',
+            }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Goal {index + 1}</h3>
               {!isReadOnly && goals.length > 1 && (
                 <button
                   onClick={() => removeGoal(index)}
-                  className="text-slate-400 hover:text-red-500 transition-colors"
+                  className="btn btn-danger btn-sm"
                   title="Remove Goal"
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={13} />
+                  <span>Remove</span>
                 </button>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-              {/* Thrust Area */}
-              <div className="md:col-span-8">
-                <label className="form-label">Thrust Area</label>
-                <select
-                  disabled={isReadOnly}
-                  value={goal.thrust_area || ''}
-                  onChange={e => updateGoal(index, 'thrust_area', e.target.value)}
-                  className="form-select disabled:bg-slate-50 disabled:text-slate-500"
-                >
-                  {THRUST_AREAS.map(ta => <option key={ta} value={ta}>{ta}</option>)}
-                </select>
+            {/* Goal Card Body */}
+            <div style={{ padding: 20 }}>
+              {/* Row 1: Thrust Area + Weightage */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label className="form-label">Thrust Area</label>
+                  <select
+                    disabled={isReadOnly}
+                    value={goal.thrust_area || ''}
+                    onChange={e => updateGoal(index, 'thrust_area', e.target.value)}
+                    className="form-select"
+                    style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                  >
+                    {THRUST_AREAS.map(ta => <option key={ta} value={ta}>{ta}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label">Weightage (%)</label>
+                  <input
+                    type="number"
+                    disabled={isReadOnly}
+                    value={goal.weightage || ''}
+                    onChange={e => updateGoal(index, 'weightage', e.target.value)}
+                    min={10} max={100}
+                    className="form-input"
+                    style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                  />
+                </div>
               </div>
 
-              {/* Weightage */}
-              <div className="md:col-span-4">
-                <label className="form-label">Weightage (%)</label>
-                <input
-                  type="number"
-                  disabled={isReadOnly}
-                  value={goal.weightage || ''}
-                  onChange={e => updateGoal(index, 'weightage', e.target.value)}
-                  min={10} max={100}
-                  className="form-input disabled:bg-slate-50 disabled:text-slate-500"
-                />
-              </div>
-
-              {/* Title */}
-              <div className="md:col-span-12">
+              {/* Row 2: Goal Title */}
+              <div style={{ marginBottom: 16 }}>
                 <label className="form-label">Goal Title</label>
                 <input
                   type="text"
                   disabled={isReadOnly}
                   value={goal.title || ''}
                   onChange={e => updateGoal(index, 'title', e.target.value)}
-                  className="form-input disabled:bg-slate-50 disabled:text-slate-500"
+                  className="form-input"
                   placeholder="E.g., Increase Q3 Sales Revenue"
+                  style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
                 />
               </div>
 
-              {/* Description */}
-              <div className="md:col-span-12">
+              {/* Row 3: Description */}
+              <div style={{ marginBottom: 16 }}>
                 <label className="form-label">Description (Optional)</label>
                 <textarea
                   disabled={isReadOnly}
                   value={goal.description || ''}
                   onChange={e => updateGoal(index, 'description', e.target.value)}
                   rows={2}
-                  className="form-textarea disabled:bg-slate-50 disabled:text-slate-500"
+                  className="form-textarea"
+                  style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
                 />
               </div>
 
-              {/* UoM Type */}
-              <div className="md:col-span-8">
-                <label className="form-label">Unit of Measurement</label>
-                <select
-                  disabled={isReadOnly}
-                  value={goal.uom_type || 'min'}
-                  onChange={e => updateGoal(index, 'uom_type', e.target.value)}
-                  className="form-select disabled:bg-slate-50 disabled:text-slate-500"
-                >
-                  {UOM_TYPES.map(uom => <option key={uom.value} value={uom.value}>{uom.label}</option>)}
-                </select>
-              </div>
+              {/* Row 4: UoM + Target */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 16 }}>
+                <div>
+                  <label className="form-label">Unit of Measurement</label>
+                  <select
+                    disabled={isReadOnly}
+                    value={goal.uom_type || 'min'}
+                    onChange={e => updateGoal(index, 'uom_type', e.target.value)}
+                    className="form-select"
+                    style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                  >
+                    {UOM_TYPES.map(uom => <option key={uom.value} value={uom.value}>{uom.label}</option>)}
+                  </select>
+                </div>
 
-              {/* Target Value/Date */}
-              <div className="md:col-span-4">
-                <label className="form-label">Target</label>
-                {goal.uom_type === 'timeline' ? (
-                  <input
-                    type="date"
-                    disabled={isReadOnly}
-                    value={goal.target_date || ''}
-                    onChange={e => updateGoal(index, 'target_date', e.target.value)}
-                    className="form-input disabled:bg-slate-50 disabled:text-slate-500"
-                  />
-                ) : (
-                  <input
-                    type="number"
-                    disabled={isReadOnly}
-                    value={goal.target_value !== undefined ? goal.target_value : ''}
-                    onChange={e => updateGoal(index, 'target_value', parseFloat(e.target.value))}
-                    className="form-input disabled:bg-slate-50 disabled:text-slate-500"
-                  />
-                )}
+                <div>
+                  <label className="form-label">Target</label>
+                  {goal.uom_type === 'timeline' ? (
+                    <input
+                      type="date"
+                      disabled={isReadOnly}
+                      value={goal.target_date || ''}
+                      onChange={e => updateGoal(index, 'target_date', e.target.value)}
+                      className="form-input"
+                      style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      disabled={isReadOnly}
+                      value={goal.target_value !== undefined ? goal.target_value : ''}
+                      onChange={e => updateGoal(index, 'target_value', parseFloat(e.target.value))}
+                      className="form-input"
+                      style={isReadOnly ? { background: 'var(--surface-raised)', color: 'var(--text-muted)' } : undefined}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
         ))}
       </div>
 
+      {/* ── Bottom Action Bar ───────────────────────────────────── */}
       {!isReadOnly && (
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between bg-white p-4 border border-slate-200 rounded-md shadow-sm">
-          <div className="flex items-center space-x-4 mb-4 sm:mb-0">
+        <div className="card" style={{
+          marginTop: 20, padding: '14px 20px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
               onClick={addGoal}
               disabled={goals.length >= 8}
-              className="flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
+              className="btn btn-secondary btn-sm"
             >
-              <Plus size={18} className="mr-1" />
-              Add Another Goal
+              <Plus size={15} />
+              <span>Add Goal</span>
             </button>
-            <span className="text-xs text-slate-500 flex items-center">
-              <Info size={14} className="mr-1" />
-              Max 8 goals allowed
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Info size={13} />
+              Max 8 goals
             </span>
           </div>
 
-          <div className="flex items-center space-x-6">
-            <div className="text-right">
-              <span className="text-sm text-slate-500 mr-2">Total Weightage:</span>
-              <span className={`text-lg font-semibold ${totalWeightage > 100 ? 'text-red-600' :
-                totalWeightage === 100 ? 'text-green-600' : 'text-amber-600'
-                }`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 6 }}>Total Weightage:</span>
+              <span style={{
+                fontSize: 15, fontWeight: 700,
+                color: totalWeightage > 100 ? 'var(--red)' :
+                  totalWeightage === 100 ? 'var(--green)' : 'var(--amber)',
+              }}>
                 {totalWeightage}/100%
               </span>
             </div>
@@ -423,7 +468,7 @@ export function GoalSheet() {
             <button
               onClick={handleSubmit}
               disabled={saving || totalWeightage !== 100}
-              className="bg-slate-900 text-white px-5 py-2 rounded-md font-medium text-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+              className="btn btn-primary"
             >
               {saving ? 'Submitting...' : 'Submit for Approval'}
             </button>

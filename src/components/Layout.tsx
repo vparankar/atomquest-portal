@@ -6,18 +6,19 @@ import {
   LogOut, Home, Settings, Users, FileText,
   UserCircle, Loader2, BarChart3, PieChart,
 } from 'lucide-react';
+import atombergLogo from '../assets/atomberg.png';
 import '../index.css';
 
 const DEMO_CREDENTIALS = {
   employee: { email: 'employee@test.com', password: 'employee' },
-  manager:  { email: 'manager@test.com',  password: 'manager'  },
-  admin:    { email: 'admin@test.com',    password: 'admin'    },
+  manager: { email: 'manager@test.com', password: 'manager' },
+  admin: { email: 'admin@test.com', password: 'admin' },
 };
 
 const ROLE_HOME = {
   employee: '/employee',
-  manager:  '/manager',
-  admin:    '/admin',
+  manager: '/manager',
+  admin: '/admin',
 };
 
 export function Layout() {
@@ -47,8 +48,8 @@ export function Layout() {
   if (loading) {
     return (
       <div className="loading-screen">
-        <div className="brand-mark" style={{ width: 32, height: 32, marginBottom: 8 }}>
-          <span>AQ</span>
+        <div style={{ marginBottom: 8 }}>
+          <img src={atombergLogo} alt="Atomberg" style={{ height: 28, borderRadius: 6, display: 'block' }} />
         </div>
         <span>Loading...</span>
       </div>
@@ -58,24 +59,24 @@ export function Layout() {
   let navItems: { name: string; path: string; icon: any }[] = [];
   if (role === 'admin') {
     navItems = [
-      { name: 'Dashboard',    path: '/admin',          icon: Home      },
-      { name: 'Analytics',   path: '/admin/analytics', icon: PieChart  },
-      { name: 'Reports',     path: '/admin/reports',   icon: BarChart3 },
-      { name: 'Manage Users',path: '/admin/users',     icon: Users     },
-      { name: 'Settings',    path: '/admin/settings',  icon: Settings  },
+      { name: 'Dashboard', path: '/admin', icon: Home },
+      { name: 'Analytics', path: '/admin/analytics', icon: PieChart },
+      { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
+      { name: 'Manage Users', path: '/admin/users', icon: Users },
+      { name: 'Settings', path: '/admin/settings', icon: Settings },
     ];
   } else if (role === 'manager') {
     navItems = [
-      { name: 'Dashboard', path: '/manager',         icon: Home      },
-      { name: 'Team Goals',path: '/manager/team',    icon: Users     },
-      { name: 'Reviews',   path: '/manager/reviews', icon: FileText  },
+      { name: 'Dashboard', path: '/manager', icon: Home },
+      { name: 'Team Goals', path: '/manager/team', icon: Users },
+      { name: 'Reviews', path: '/manager/reviews', icon: FileText },
     ];
   } else {
     navItems = [
-      { name: 'Dashboard', path: '/employee',          icon: Home       },
-      { name: 'My Goals',  path: '/employee/goals',    icon: FileText   },
-      { name: 'Check-In',  path: '/employee/checkin',  icon: BarChart3  },
-      { name: 'Profile',   path: '/employee/profile',  icon: UserCircle },
+      { name: 'Dashboard', path: '/employee', icon: Home },
+      { name: 'My Goals', path: '/employee/goals', icon: FileText },
+      { name: 'Check-In', path: '/employee/checkin', icon: BarChart3 },
+      { name: 'Profile', path: '/employee/profile', icon: UserCircle },
     ];
   }
 
@@ -88,8 +89,8 @@ export function Layout() {
       <aside className="sidebar">
         {/* Header */}
         <div className="sidebar-header">
-          <div className="brand-mark">
-            <span>AQ</span>
+          <div className="brand-mark" style={{ background: 'transparent', boxShadow: 'none' }}>
+            <img src={atombergLogo} alt="Atomberg" style={{ height: 28, borderRadius: 6, display: 'block' }} />
           </div>
           <div>
             <div className="brand-title">AtomQuest</div>

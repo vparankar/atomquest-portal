@@ -216,20 +216,31 @@ export function CheckIn() {
   };
 
   if (loading) {
-    return <div className="p-8"><Spinner /></div>;
+    return <div style={{ padding: 32 }}><Spinner /></div>;
   }
 
   if (!activeCycle) {
-    return <div className="p-8 text-center text-red-500">No active cycle found.</div>;
+    return (
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 32px' }}>
+        <div className="alert alert-red">
+          <AlertCircle size={16} style={{ flexShrink: 0 }} />
+          <span>No active cycle found.</span>
+        </div>
+      </div>
+    );
   }
 
   if (!isOpen) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-4 text-center">
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-8">
-          <AlertCircle className="mx-auto h-12 w-12 text-slate-400 mb-4" />
-          <h2 className="text-xl font-semibold text-slate-800 mb-2">Check-in window not open</h2>
-          <p className="text-slate-600">
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 32px' }}>
+        <div className="card" style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <div style={{ marginBottom: 12 }}>
+            <AlertCircle size={36} style={{ color: 'var(--border-strong)' }} />
+          </div>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
+            Check-in window not open
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
             The current check-in phase ({activeCycle.phase.toUpperCase()}) is open from {activeCycle.opens_at} to {activeCycle.closes_at}.
           </p>
         </div>
@@ -239,13 +250,13 @@ export function CheckIn() {
 
   if (goals.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-4 text-center">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-8">
-          <AlertCircle className="mx-auto h-12 w-12 text-amber-500 mb-4" />
-          <h2 className="text-xl font-semibold text-amber-800 mb-2">No Approved Goals Found</h2>
-          <p className="text-amber-700">
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 32px' }}>
+        <div className="alert alert-amber" style={{ flexDirection: 'column', alignItems: 'center', padding: '48px 24px' }}>
+          <AlertCircle size={36} style={{ marginBottom: 12, color: 'var(--amber)' }} />
+          <strong style={{ fontSize: 16, marginBottom: 4 }}>No Approved Goals Found</strong>
+          <span style={{ fontSize: 13 }}>
             You do not have an approved goal sheet for the current cycle phase.
-          </p>
+          </span>
         </div>
       </div>
     );
@@ -253,93 +264,132 @@ export function CheckIn() {
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 32px' }}>
-      <div className="mb-8 flex justify-between items-end border-b border-slate-200 pb-4">
+      {/* ── Page Header ─────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
+        borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 24,
+      }}>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Check-In</h1>
-          <p className="text-slate-500 mt-1">Cycle: {activeCycle.year} - {activeCycle.phase.toUpperCase()}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: -0.3 }}>
+            Check-In
+          </h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+            Cycle: {activeCycle.year} - {activeCycle.phase.toUpperCase()}
+          </p>
         </div>
       </div>
 
-      <div className="space-y-6">
+      {/* ── Goals List ──────────────────────────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {goals.map((goal, index) => (
-          <div key={goal.id} className="bg-white border border-slate-200 rounded-md p-6 shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between mb-4 border-b border-slate-100 pb-4">
+          <div key={goal.id} className="card" style={{ padding: 0 }}>
+            {/* Goal Info Header */}
+            <div style={{
+              padding: '14px 20px', borderBottom: '1px solid var(--border)',
+              background: 'var(--surface-raised)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+              flexWrap: 'wrap', gap: 12,
+            }}>
               <div>
-                <span className="inline-block px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded mb-2">{goal.thrust_area}</span>
-                <h3 className="text-lg font-medium text-slate-800">{goal.title}</h3>
-                {goal.description && <p className="text-sm text-slate-500 mt-1">{goal.description}</p>}
-              </div>
-              <div className="mt-4 md:mt-0 text-right">
-                <div className="text-sm text-slate-500">Target</div>
-                <div className="font-medium text-slate-900">
-                  {goal.uom_type === 'timeline' ? goal.target_date : goal.target_value}
-                  {goal.uom_type !== 'timeline' && <span className="text-xs text-slate-400 ml-1">({goal.uom_type})</span>}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
-              <div className="md:col-span-2">
-                <label className="form-label">
-                  Actual {goal.uom_type === 'timeline' ? 'Date' : 'Value'}
-                </label>
-                {goal.uom_type === 'timeline' ? (
-                  <input
-                    type="date"
-                    value={goal.actual_date || ''}
-                    onChange={e => handleChange(index, 'actual_date', e.target.value)}
-                    className="form-input"
-                  />
-                ) : (
-                  <input
-                    type="number"
-                    value={goal.actual_value || ''}
-                    onChange={e => handleChange(index, 'actual_value', e.target.value)}
-                    className="form-input"
-                  />
+                <span className="badge badge-gray" style={{ marginBottom: 6, display: 'inline-block' }}>
+                  {goal.thrust_area}
+                </span>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{goal.title}</h3>
+                {goal.description && (
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{goal.description}</p>
                 )}
               </div>
-
-              <div>
-                <label className="form-label">Status</label>
-                <select
-                  value={goal.checkin_status}
-                  onChange={e => handleChange(index, 'checkin_status', e.target.value)}
-                  className="form-select"
-                >
-                  <option value="not_started">Not Started</option>
-                  <option value="on_track">On Track</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-md text-center border border-slate-100">
-                <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">Score</div>
-                <div className={`text-xl font-semibold ${(goal.score || 0) >= 100 ? 'text-green-600' :
-                  (goal.score || 0) >= 50 ? 'text-amber-600' : 'text-slate-700'
-                  }`}>
-                  {goal.score || 0}%
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>Target</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                  {goal.uom_type === 'timeline' ? goal.target_date : goal.target_value}
+                  {goal.uom_type !== 'timeline' && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>({goal.uom_type})</span>
+                  )}
                 </div>
               </div>
             </div>
 
-            {goal.manager_comment && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded text-sm">
-                <span className="font-semibold text-blue-800">Manager Comment: </span>
-                <span className="text-blue-700">{goal.manager_comment}</span>
+            {/* Check-in Fields */}
+            <div style={{ padding: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 120px', gap: 16, alignItems: 'end' }}>
+                {/* Actual Value/Date */}
+                <div>
+                  <label className="form-label">
+                    Actual {goal.uom_type === 'timeline' ? 'Date' : 'Value'}
+                  </label>
+                  {goal.uom_type === 'timeline' ? (
+                    <input
+                      type="date"
+                      value={goal.actual_date || ''}
+                      onChange={e => handleChange(index, 'actual_date', e.target.value)}
+                      className="form-input"
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      value={goal.actual_value || ''}
+                      onChange={e => handleChange(index, 'actual_value', e.target.value)}
+                      className="form-input"
+                    />
+                  )}
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="form-label">Status</label>
+                  <select
+                    value={goal.checkin_status}
+                    onChange={e => handleChange(index, 'checkin_status', e.target.value)}
+                    className="form-select"
+                  >
+                    <option value="not_started">Not Started</option>
+                    <option value="on_track">On Track</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+
+                {/* Score */}
+                <div style={{
+                  background: 'var(--surface-raised)', padding: '8px 12px',
+                  borderRadius: 'var(--radius-md)', textAlign: 'center',
+                  border: '1px solid var(--border)',
+                }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+                    Score
+                  </div>
+                  <div style={{
+                    fontSize: 18, fontWeight: 700,
+                    color: (goal.score || 0) >= 100 ? 'var(--green)' :
+                      (goal.score || 0) >= 50 ? 'var(--amber)' : 'var(--text-secondary)',
+                  }}>
+                    {goal.score || 0}%
+                  </div>
+                </div>
               </div>
-            )}
+
+              {/* Manager Comment */}
+              {goal.manager_comment && (
+                <div className="alert alert-blue" style={{ marginTop: 16 }}>
+                  <div>
+                    <strong>Manager Comment: </strong>
+                    <span>{goal.manager_comment}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-8 flex justify-end">
+      {/* ── Save Button ─────────────────────────────────────────── */}
+      <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center bg-slate-900 text-white px-6 py-2 rounded-md font-medium text-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+          className="btn btn-primary"
         >
-          <Save size={18} className="mr-2" />
+          <Save size={15} />
           {saving ? 'Saving...' : 'Save Check-In'}
         </button>
       </div>
