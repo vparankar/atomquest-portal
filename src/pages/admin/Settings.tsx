@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Cycle } from '../../types';
-import { Settings as SettingsIcon, Database, Zap, AlertTriangle, CheckCircle2, Info, MessageSquare, Mail } from 'lucide-react';
+import { Settings as SettingsIcon, Database, Zap, AlertTriangle, CheckCircle2, Info, MessageSquare, Mail, AlertCircle, Save } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
 
@@ -11,7 +11,17 @@ export function Settings() {
   const [stats, setStats] = useState({ profiles: 0, goalSheets: 0, goals: 0, achievements: 0, auditLogs: 0 });
   const [teamsEnabled, setTeamsEnabled] = useState(localStorage.getItem('atomquest_teams_enabled') === 'true');
   const [emailEnabled, setEmailEnabled] = useState(localStorage.getItem('atomquest_email_enabled') === 'true');
+
+  const defaultRules = { goalSubmitDays: 7, managerApproveDays: 5, checkinDays: 10, enabled: true };
+  const savedRules = localStorage.getItem('atomquest_escalation_rules');
+  const [escalationRules, setEscalationRules] = useState(savedRules ? JSON.parse(savedRules) : defaultRules);
+
   const { toast } = useToast();
+
+  const saveEscalationRules = () => {
+    localStorage.setItem('atomquest_escalation_rules', JSON.stringify(escalationRules));
+    toast.success('Escalation rules saved successfully');
+  };
 
   useEffect(() => { loadSystemInfo(); }, []);
 
@@ -194,6 +204,57 @@ export function Settings() {
               </div>
               {emailEnabled && <div style={{ fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> SMTP Configured</div>}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Escalation Rules */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertCircle size={16} style={{ color: 'var(--red)' }} />
+            <span className="card-title">Escalation Rules</span>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <div style={{ position: 'relative' }}>
+              <input type="checkbox" className="sr-only" checked={escalationRules.enabled} onChange={(e) => setEscalationRules({ ...escalationRules, enabled: e.target.checked })} />
+              <div style={{ width: 36, height: 20, background: escalationRules.enabled ? 'var(--green)' : '#E5E7EB', borderRadius: 20, transition: 'background-color 0.2s' }}></div>
+              <div style={{ position: 'absolute', top: 2, left: escalationRules.enabled ? 18 : 2, width: 16, height: 16, background: 'white', borderRadius: '50%', transition: 'left 0.2s' }}></div>
+            </div>
+          </label>
+        </div>
+        <div className="card-body">
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Configure when escalation notifications are triggered. These rules are evaluated when an admin runs the escalation check from the Escalations page.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, opacity: escalationRules.enabled ? 1 : 0.5, pointerEvents: escalationRules.enabled ? 'auto' : 'none' }}>
+            <div style={{ padding: 16, background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Goal Submission</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>Notify employee if goals not submitted within N days of cycle open</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="number" min={1} max={30} value={escalationRules.goalSubmitDays} onChange={(e) => setEscalationRules({ ...escalationRules, goalSubmitDays: parseInt(e.target.value) || 7 })} className="form-input" style={{ width: 70, textAlign: 'center' }} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>days</span>
+              </div>
+            </div>
+            <div style={{ padding: 16, background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Manager Approval</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>Notify manager if goals not approved within N days of submission</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="number" min={1} max={30} value={escalationRules.managerApproveDays} onChange={(e) => setEscalationRules({ ...escalationRules, managerApproveDays: parseInt(e.target.value) || 5 })} className="form-input" style={{ width: 70, textAlign: 'center' }} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>days</span>
+              </div>
+            </div>
+            <div style={{ padding: 16, background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Check-In Completion</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10 }}>Notify employee if check-in not completed within N days of quarter</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="number" min={1} max={30} value={escalationRules.checkinDays} onChange={(e) => setEscalationRules({ ...escalationRules, checkinDays: parseInt(e.target.value) || 10 })} className="form-input" style={{ width: 70, textAlign: 'center' }} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>days</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={saveEscalationRules} className="btn btn-primary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Save size={14} /> Save Rules
+            </button>
           </div>
         </div>
       </div>

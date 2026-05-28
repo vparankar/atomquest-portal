@@ -5,6 +5,7 @@ import type { GoalSheet, Goal, Profile } from '../../types';
 import { Check, X, MessageSquare } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
+import { notificationService } from '../../lib/notifications';
 
 interface GoalSheetWithRelations extends GoalSheet {
   profiles: Profile;
@@ -65,6 +66,14 @@ export function ApprovalQueue() {
       setSheets(sheets.filter(s => s.id !== sheet.id));
       toast.success('Sheet approved');
       
+      await notificationService.createNotification({
+        user_id: sheet.employee_id,
+        type: 'goal_approved',
+        title: 'Goals Approved',
+        message: 'Your manager has approved your goal sheet.',
+        action_url: '/employee/goals'
+      });
+
       if (localStorage.getItem('atomquest_teams_enabled') === 'true') {
         setTimeout(() => toast.success('Teams notification sent to employee'), 800);
       }
@@ -84,6 +93,17 @@ export function ApprovalQueue() {
       setSheets(sheets.filter(s => s.id !== reworkSheetId));
       setReworkSheetId(null); setReworkComment('');
       toast.success('Sheet returned for rework');
+
+      const sheet = sheets.find(s => s.id === reworkSheetId);
+      if (sheet) {
+        await notificationService.createNotification({
+          user_id: sheet.employee_id,
+          type: 'goal_rejected',
+          title: 'Goals Returned for Rework',
+          message: `Your manager has returned your goals for rework: "${reworkComment}"`,
+          action_url: '/employee/goals'
+        });
+      }
     } catch { toast.error('Failed.'); } finally { setSavingId(null); }
   };
 

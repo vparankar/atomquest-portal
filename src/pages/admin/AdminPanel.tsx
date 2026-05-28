@@ -157,7 +157,7 @@ function CycleManagement() {
       // ── Step 2: Set departments & manager assignments on profiles ──
       const profileUpdates = [
         { id: employeeProfile.id, full_name: 'Priya Sharma', department: 'Product Engineering', manager_id: managerProfile.id },
-        { id: managerProfile.id, full_name: 'Rajesh Nair', department: 'Product Engineering', manager_id: null },
+        { id: managerProfile.id, full_name: 'Rajesh Nair', department: 'Product Engineering', manager_id: managerProfile.id },
       ];
       if (adminProfile) {
         profileUpdates.push({ id: adminProfile.id, full_name: 'Anita Desai', department: 'People & Operations', manager_id: null });
@@ -376,8 +376,27 @@ function CycleManagement() {
       ];
       await supabase.from('audit_logs').insert(auditEntries);
 
+      // ── Step 6: Seed demo notifications ──
       if (seededCount > 0) {
-        toast.success(`Seeded ${seededCount} employee(s) with 6 goals each, Q1 + Q2 achievements, and Q2 as the active cycle!`);
+        const now = new Date();
+        const demoNotifications = [
+          // Employee notifications
+          { user_id: employeeProfile.id, type: 'goal_approved', title: 'Goals Approved', message: 'Your manager has approved your goal sheet for Q2 2026.', is_read: true, action_url: '/employee/goals', created_at: new Date(now.getTime() - 25 * 86400000).toISOString() },
+          { user_id: employeeProfile.id, type: 'checkin_reminder', title: 'Q2 Check-In Reminder', message: 'Please log your Q2 progress for all goals before the end of the quarter.', is_read: false, action_url: '/employee/checkin', created_at: new Date(now.getTime() - 3 * 86400000).toISOString() },
+          { user_id: employeeProfile.id, type: 'system', title: 'Welcome to AtomQuest', message: 'Your performance management portal is ready. Start by reviewing your goals.', is_read: true, action_url: '/employee', created_at: new Date(now.getTime() - 30 * 86400000).toISOString() },
+          // Manager notifications
+          { user_id: managerProfile.id, type: 'goal_submitted', title: 'Goal Sheet Submitted', message: 'Priya Sharma has submitted their goal sheet for approval.', is_read: true, action_url: '/manager/team', created_at: new Date(now.getTime() - 26 * 86400000).toISOString() },
+          { user_id: managerProfile.id, type: 'checkin_reminder', title: 'Team Check-In Review', message: 'Your team has pending Q2 check-ins waiting for your review.', is_read: false, action_url: '/manager/reviews', created_at: new Date(now.getTime() - 2 * 86400000).toISOString() },
+          { user_id: managerProfile.id, type: 'goal_approved', title: 'Your Goals Approved', message: 'Your own goal sheet for Q2 2026 has been approved.', is_read: true, action_url: '/manager/goals', created_at: new Date(now.getTime() - 24 * 86400000).toISOString() },
+        ];
+        if (adminProfile) {
+          demoNotifications.push(
+            { user_id: adminProfile.id, type: 'system', title: 'Demo Data Seeded', message: `${seededCount} employee(s) seeded with goals and achievements.`, is_read: false, action_url: '/admin', created_at: now.toISOString() },
+            { user_id: adminProfile.id, type: 'system', title: 'Q2 Cycle Active', message: 'The Q2 2026 cycle is now active. All employees have approved goal sheets.', is_read: true, action_url: '/admin/analytics', created_at: new Date(now.getTime() - 20 * 86400000).toISOString() },
+          );
+        }
+        await supabase.from('notifications').insert(demoNotifications);
+        toast.success(`Seeded ${seededCount} employee(s) with goals, achievements, and ${demoNotifications.length} notifications!`);
       } else {
         toast.success('Demo data already exists — no duplicates created.');
       }

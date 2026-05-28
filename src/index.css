@@ -277,6 +277,20 @@ body {
   background-color: var(--bg);
 }
 
+.desktop-notification-bell {
+  display: none;
+  position: absolute;
+  top: 16px;
+  right: 28px;
+  z-index: 10;
+}
+
+@media (min-width: 769px) {
+  .desktop-notification-bell {
+    display: block;
+  }
+}
+
 /* ─── Page Header ────────────────────────────────────────────────────── */
 .page-header {
   padding: 24px 32px 0;

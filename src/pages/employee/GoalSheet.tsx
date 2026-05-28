@@ -5,6 +5,7 @@ import type { GoalSheet as GoalSheetType, Goal, Cycle } from '../../types';
 import { Lock, Plus, Trash2, AlertCircle, Info } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
+import { notificationService } from '../../lib/notifications';
 
 const THRUST_AREAS = ["Revenue", "Cost", "Customer", "People", "Process", "Quality"];
 const UOM_TYPES = [
@@ -22,7 +23,7 @@ const statusBadge: Record<string, string> = {
 };
 
 export function GoalSheet() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
   const [goalSheet, setGoalSheet] = useState<GoalSheetType | null>(null);
   const [goals, setGoals] = useState<Partial<Goal>[]>([]);
@@ -225,6 +226,17 @@ export function GoalSheet() {
       });
 
       toast.success('Goals submitted successfully!');
+
+      if (profile?.manager_id) {
+        await notificationService.createNotification({
+          user_id: profile.manager_id,
+          type: 'goal_submitted',
+          title: 'Goal Sheet Submitted',
+          message: `${profile.full_name || 'An employee'} has submitted their goal sheet for approval.`,
+          action_url: '/manager/team'
+        });
+      }
+
       if (localStorage.getItem('atomquest_teams_enabled') === 'true') {
         setTimeout(() => toast.success('Teams notification sent to your manager'), 800);
       }

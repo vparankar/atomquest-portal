@@ -4,9 +4,10 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import {
   LogOut, Home, Settings, Users, FileText,
-  UserCircle, Loader2, BarChart3, PieChart, Menu, X
+  UserCircle, Loader2, BarChart3, PieChart, Menu, X, AlertCircle
 } from 'lucide-react';
 import atombergLogo from '../assets/atomberg.png';
+import { NotificationBell } from './NotificationBell';
 import '../index.css';
 
 const DEMO_CREDENTIALS = {
@@ -63,16 +64,17 @@ export function Layout() {
       { name: 'Dashboard', path: '/admin', icon: Home },
       { name: 'Analytics', path: '/admin/analytics', icon: PieChart },
       { name: 'Reports', path: '/admin/reports', icon: BarChart3 },
+      { name: 'Escalations', path: '/admin/escalations', icon: AlertCircle },
       { name: 'Manage Users', path: '/admin/users', icon: Users },
       { name: 'Settings', path: '/admin/settings', icon: Settings },
     ];
   } else if (role === 'manager') {
     navItems = [
       { name: 'Dashboard', path: '/manager', icon: Home },
-      { name: 'Team Goals', path: '/manager/team', icon: Users },
-      { name: 'Reviews', path: '/manager/reviews', icon: FileText },
       { name: 'My Goals', path: '/manager/goals', icon: FileText },
       { name: 'Check-In', path: '/manager/checkin', icon: BarChart3 },
+      { name: 'Team Goals', path: '/manager/team', icon: Users },
+      { name: 'Reviews', path: '/manager/reviews', icon: FileText },
       { name: 'Profile', path: '/manager/profile', icon: UserCircle },
     ];
   } else {
@@ -92,8 +94,8 @@ export function Layout() {
     <div className="layout-container">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
-        <div 
-          className="sidebar-overlay" 
+        <div
+          className="sidebar-overlay"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -108,7 +110,7 @@ export function Layout() {
             <div className="brand-title">AtomQuest</div>
             <span className="brand-subtitle">by Atomberg</span>
           </div>
-          <button 
+          <button
             className="mobile-close-btn"
             onClick={() => setIsSidebarOpen(false)}
           >
@@ -188,11 +190,11 @@ export function Layout() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className="main-content" style={{ position: 'relative' }}>
         {/* Mobile Header */}
-        <div className="mobile-topbar">
+        <div className="mobile-topbar" style={{ justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button 
+            <button
               className="hamburger-btn"
               onClick={() => setIsSidebarOpen(true)}
             >
@@ -203,6 +205,12 @@ export function Layout() {
             </div>
             <div className="brand-title" style={{ color: 'var(--text)', fontSize: 16 }}>AtomQuest</div>
           </div>
+          <NotificationBell />
+        </div>
+
+        {/* Desktop Bell - only visible on larger screens */}
+        <div className="desktop-notification-bell">
+          <NotificationBell />
         </div>
 
         <Outlet />

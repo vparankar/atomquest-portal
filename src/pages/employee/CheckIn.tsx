@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import type { Cycle, Goal } from '../../types';
@@ -22,6 +22,7 @@ export function CheckIn() {
   const [goals, setGoals] = useState<GoalWithCheckIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const initialGoalsRef = useRef<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -100,6 +101,7 @@ export function CheckIn() {
         });
 
         setGoals(merged);
+        initialGoalsRef.current = JSON.stringify(merged.map(g => ({ actual_value: g.actual_value, actual_date: g.actual_date, checkin_status: g.checkin_status })));
       }
     } catch (err: any) {
       console.error(err);
@@ -204,6 +206,7 @@ export function CheckIn() {
         return g;
       });
       setGoals(updatedGoals);
+      initialGoalsRef.current = JSON.stringify(updatedGoals.map(g => ({ actual_value: g.actual_value, actual_date: g.actual_date, checkin_status: g.checkin_status })));
 
       toast.success('Check-in saved successfully!');
 
@@ -388,7 +391,7 @@ export function CheckIn() {
       <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || JSON.stringify(goals.map(g => ({ actual_value: g.actual_value, actual_date: g.actual_date, checkin_status: g.checkin_status }))) === initialGoalsRef.current}
           className="btn btn-primary"
         >
           <Save size={15} />
