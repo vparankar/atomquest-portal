@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import type { Cycle, Profile } from '../../types';
+import { useCycles, useApprovedSheets, useEmployees, useAuditLogs } from '../../hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import type { Cycle } from '../../types';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
 import * as XLSX from 'xlsx';
@@ -52,8 +54,8 @@ export function AdminPanel() {
 // ─── Cycle Management ────────────────────────────────────────────────────────
 
 function CycleManagement() {
-  const [cycles, setCycles] = useState<Cycle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: cycles = [], isLoading: loading } = useCycles();
+  const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [year, setYear] = useState(new Date().getFullYear());
@@ -63,19 +65,7 @@ function CycleManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchCycles();
-  }, []);
-
-  const fetchCycles = async () => {
-    const { data, error } = await supabase
-      .from('cycles')
-      .select('*')
-      .order('year', { ascending: false })
-
-    if (!error && data) setCycles(data);
-    setLoading(false);
-  };
+  const fetchCycles = () => queryClient.invalidateQueries({ queryKey: ['cycles'] });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -494,32 +484,18 @@ function CycleManagement() {
 // ─── Goal Unlock ─────────────────────────────────────────────────────────────
 
 function GoalUnlock({ user }: { user: any }) {
-  const [sheets, setSheets] = useState<any[]>([]);
+  const { data: sheetsData = [] } = useApprovedSheets();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [reason, setReason] = useState('');
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const searchSheets = async () => {
-    const { data, error } = await supabase
-      .from('goal_sheets')
-      .select('*, profiles!goal_sheets_employee_id_fkey(full_name)')
-      .eq('status', 'approved');
+  const searchSheets = () => queryClient.invalidateQueries({ queryKey: ['approvedSheets'] });
 
-    if (error) { console.error(error); return; }
-
-    let filtered = (data as any[]) || [];
-    if (searchTerm) {
-      filtered = filtered.filter((s) =>
-        s.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    setSheets(filtered);
-  };
-
-  useEffect(() => {
-    searchSheets();
-  }, [searchTerm]);
+  const sheets = searchTerm
+    ? sheetsData.filter((s: any) => s.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+    : sheetsData;
 
   const handleUnlock = async (sheetId: string) => {
     if (!reason.trim()) {
@@ -599,7 +575,7 @@ function GoalUnlock({ user }: { user: any }) {
 // ─── Shared Goals ─────────────────────────────────────────────────────────────
 
 function SharedGoals() {
-  const [employees, setEmployees] = useState<Profile[]>([]);
+  const { data: employees = [] } = useEmployees();
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
 
   const [title, setTitle] = useState('');
@@ -609,17 +585,6 @@ function SharedGoals() {
   const [target, setTarget] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('role', ['employee', 'manager']);
-      if (data) setEmployees(data);
-    };
-    fetchEmployees();
-  }, []);
 
   const handleToggleEmployee = (id: string) => {
     setSelectedEmployees((prev) =>
@@ -778,41 +743,11 @@ function SharedGoals() {
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 
 function AuditLogViewer() {
-  const [logs, setLogs] = useState<any[]>([]);
   const [entityFilter, setEntityFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [loading, setLoading] = useState(true);
+  const { data: logs = [], isLoading: loading } = useAuditLogs(entityFilter, startDate, endDate);
   const { toast } = useToast();
-
-  useEffect(() => {
-    fetchLogs();
-  }, [entityFilter, startDate, endDate]);
-
-  const fetchLogs = async () => {
-    setLoading(true);
-    let query = supabase
-      .from('audit_logs')
-      .select('*, profiles!audit_logs_changed_by_fkey(full_name)')
-      .order('changed_at', { ascending: false })
-      .limit(100);
-
-    if (entityFilter) query = query.eq('entity_type', entityFilter);
-    if (startDate) query = query.gte('changed_at', new Date(startDate).toISOString());
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      query = query.lte('changed_at', end.toISOString());
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      console.error('Audit log fetch error:', error);
-      toast.error('Audit log fetch error: ' + error.message);
-    }
-    if (data) setLogs(data);
-    setLoading(false);
-  };
 
   const handleExport = () => {
     const ws = XLSX.utils.json_to_sheet(logs.map(log => ({
