@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useCheckIn, queryKeys } from '../../hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Cycle, Goal } from '../../types';
 import { AlertCircle, Save } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
@@ -17,99 +19,28 @@ interface GoalWithCheckIn extends Goal {
 
 export function CheckIn() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { data: queryData, isLoading: queryLoading } = useCheckIn(user?.id);
+
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [goals, setGoals] = useState<GoalWithCheckIn[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const initialGoalsRef = useRef<string>('');
   const { toast } = useToast();
 
+  // Sync from query data to local state
   useEffect(() => {
-    if (!user) return;
-    loadData();
-  }, [user?.id]);
-
-  async function loadData() {
-    try {
-      setLoading(true);
-      // Fetch active cycle
-      const { data: cycleData, error: cycleError } = await supabase
-        .from('cycles')
-        .select('*')
-        .eq('is_active', true)
-        .single();
-
-      if (cycleError) throw cycleError;
-      if (!cycleData) {
-        setLoading(false);
-        return;
-      }
-
-      setActiveCycle(cycleData);
-
-      // Check if window is open
-      const today = new Date().toISOString().split('T')[0];
-      const open = today >= cycleData.opens_at && today <= cycleData.closes_at;
-      setIsOpen(open);
-
-      if (!open) {
-        setLoading(false);
-        return;
-      }
-
-      // Fetch approved goal sheet
-      const { data: sheetData, error: sheetError } = await supabase
-        .from('goal_sheets')
-        .select('*')
-        .eq('employee_id', user!.id)
-        .eq('cycle_id', cycleData.id)
-        .eq('status', 'approved')
-        .maybeSingle();
-
-      if (sheetError) throw sheetError;
-
-      if (sheetData) {
-        // Fetch goals
-        const { data: goalsData, error: goalsError } = await supabase
-          .from('goals')
-          .select('*')
-          .eq('sheet_id', sheetData.id);
-
-        if (goalsError) throw goalsError;
-
-        // Fetch existing achievements for this cycle phase
-        const { data: achievementsData, error: achievementsError } = await supabase
-          .from('achievements')
-          .select('*')
-          .in('goal_id', goalsData?.map(g => g.id) || [])
-          .eq('cycle_phase', cycleData.phase);
-
-        if (achievementsError) throw achievementsError;
-
-        const merged: GoalWithCheckIn[] = (goalsData || []).map(g => {
-          const ach = achievementsData?.find(a => a.goal_id === g.id);
-          return {
-            ...g,
-            achievement_id: ach?.id,
-            actual_value: ach?.actual_value !== null ? ach?.actual_value : '',
-            actual_date: ach?.actual_date || '',
-            checkin_status: ach?.status || 'not_started',
-            score: ach?.score || 0,
-            manager_comment: ach?.manager_comment || ''
-          };
-        });
-
-        setGoals(merged);
-        initialGoalsRef.current = JSON.stringify(merged.map(g => ({ actual_value: g.actual_value, actual_date: g.actual_date, checkin_status: g.checkin_status })));
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to load data');
-    } finally {
-      setLoading(false);
+    if (!queryData) return;
+    setActiveCycle(queryData.activeCycle);
+    setIsOpen(queryData.isOpen);
+    if (queryData.goals.length > 0) {
+      setGoals(queryData.goals as GoalWithCheckIn[]);
+      initialGoalsRef.current = JSON.stringify(queryData.goals.map((g: any) => ({ actual_value: g.actual_value, actual_date: g.actual_date, checkin_status: g.checkin_status })));
     }
-  }
+    setInitialized(true);
+  }, [queryData]);
 
   const computeScore = (goal: GoalWithCheckIn, actualVal: number | string, actualDate: string): number => {
     if (goal.uom_type === 'timeline') {
@@ -208,6 +139,10 @@ export function CheckIn() {
       setGoals(updatedGoals);
       initialGoalsRef.current = JSON.stringify(updatedGoals.map(g => ({ actual_value: g.actual_value, actual_date: g.actual_date, checkin_status: g.checkin_status })));
 
+      // Invalidate related caches
+      queryClient.invalidateQueries({ queryKey: queryKeys.checkIn(user!.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employeeStats(user!.id) });
+
       toast.success('Check-in saved successfully!');
 
     } catch (err: any) {
@@ -218,7 +153,7 @@ export function CheckIn() {
     }
   };
 
-  if (loading) {
+  if (queryLoading && !initialized) {
     return <div style={{ padding: 32 }}><Spinner /></div>;
   }
 

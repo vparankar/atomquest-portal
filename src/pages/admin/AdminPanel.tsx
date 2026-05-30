@@ -8,6 +8,7 @@ import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
 import * as XLSX from 'xlsx';
 import { Download } from 'lucide-react';
+import { notificationService } from '../../lib/notifications';
 
 export function AdminPanel() {
   const { user } = useAuth();
@@ -163,13 +164,17 @@ function CycleManagement() {
         profileUpdates.push({ id: adminProfile.id, full_name: 'Anita Desai', department: 'People & Operations', manager_id: null });
       }
 
-      for (const upd of profileUpdates) {
-        await supabase.from('profiles').update({
+      await Promise.all(profileUpdates.map(upd =>
+        supabase.from('profiles').update({
           full_name: upd.full_name,
           department: upd.department,
           manager_id: upd.manager_id,
-        }).eq('id', upd.id);
-      }
+        }).eq('id', upd.id)
+      ));
+
+      // Nuclear reset: wipe all transactional data server-side via RPC
+      const { error: resetErr } = await supabase.rpc('reset_demo_data');
+      if (resetErr) throw new Error('Failed to reset data: ' + resetErr.message);
 
       // ── Step 3: Create cycles for 2026 — Q2 is active (current quarter) ──
       const cycleDefinitions = [
@@ -184,12 +189,11 @@ function CycleManagement() {
       await supabase.from('cycles').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000');
 
       const cycleIds: Record<string, string> = {};
-      for (const cd of cycleDefinitions) {
+      await Promise.all(cycleDefinitions.map(async (cd) => {
         const { data: existing } = await supabase
           .from('cycles').select('id')
           .eq('year', cd.year).eq('phase', cd.phase)
           .maybeSingle();
-
         if (existing) {
           await supabase.from('cycles').update({ is_active: cd.is_active, opens_at: cd.opens_at, closes_at: cd.closes_at }).eq('id', existing.id);
           cycleIds[cd.phase] = existing.id;
@@ -199,7 +203,7 @@ function CycleManagement() {
           if (error) throw error;
           cycleIds[cd.phase] = newCycle.id;
         }
-      }
+      }));
 
       const q2CycleId = cycleIds['q2'];
 
@@ -283,123 +287,88 @@ function CycleManagement() {
       ];
 
       let seededCount = 0;
-      for (const emp of employees) {
+      await Promise.all(employees.map(async (emp) => {
         const isManager = emp.role === 'manager';
         const templates = isManager ? managerGoalTemplates : employeeGoalTemplates;
         const q1Ach = isManager ? q1Achievements_manager : q1Achievements_employee;
         const q2Ach = isManager ? q2Achievements_manager : q2Achievements_employee;
+        const sheetStatus = isManager ? 'submitted' : 'approved';
 
-        // Check if goal sheet already exists for Q2
-        const { data: existingSheet } = await supabase
-          .from('goal_sheets').select('id')
-          .eq('employee_id', emp.id).eq('cycle_id', q2CycleId)
-          .maybeSingle();
-
-        if (existingSheet) continue;
-
-        // Create goal sheet for Q2 (active cycle)
         const { data: newSheet, error: sheetErr } = await supabase
           .from('goal_sheets')
           .insert({
-            employee_id: emp.id,
-            cycle_id: q2CycleId,
-            status: 'approved',
+            employee_id: emp.id, cycle_id: q2CycleId, status: sheetStatus,
             submitted_at: '2026-04-02T10:00:00Z',
-            approved_at: '2026-04-03T14:30:00Z',
+            ...(sheetStatus === 'approved' ? { approved_at: '2026-04-03T14:30:00Z' } : {})
           })
           .select().single();
-
         if (sheetErr) throw sheetErr;
 
-        // Create goals
         const goalsToInsert = templates.map(gt => ({
-          sheet_id: newSheet.id,
-          thrust_area: gt.thrust_area,
-          title: gt.title,
-          description: gt.description,
-          uom_type: gt.uom_type,
+          sheet_id: newSheet.id, thrust_area: gt.thrust_area, title: gt.title,
+          description: gt.description, uom_type: gt.uom_type,
           target_value: gt.target_value ?? null,
           target_date: ('target_date' in gt) ? gt.target_date : null,
-          weightage: gt.weightage,
-          status: 'on_track' as const,
+          weightage: gt.weightage, status: 'on_track' as const,
           is_shared: ('is_shared' in gt) ? gt.is_shared : false,
           shared_from: ('is_shared' in gt && gt.is_shared) ? sharedMasterGoalId : null,
         }));
 
         const { data: insertedGoals, error: goalsErr } = await supabase
           .from('goals').insert(goalsToInsert).select();
-
         if (goalsErr) throw goalsErr;
 
-        // Create achievements for Q1 (historical) and Q2 (current/in-progress)
         const achievementsToInsert: any[] = [];
-
-        // Q1 achievements — completed quarter
         insertedGoals.forEach((goal: any, i: number) => {
-          const achData = q1Ach[i];
           achievementsToInsert.push({
-            goal_id: goal.id,
-            cycle_phase: 'q1',
-            status: achData.status,
-            score: achData.score,
-            actual_value: achData.actual_value ?? null,
-            actual_date: ('actual_date' in achData) ? achData.actual_date : null,
+            goal_id: goal.id, cycle_phase: 'q1', status: q1Ach[i].status,
+            score: q1Ach[i].score, actual_value: q1Ach[i].actual_value ?? null,
+            actual_date: ('actual_date' in q1Ach[i]) ? q1Ach[i].actual_date : null,
             manager_comment: isManager ? 'Solid Q1 leadership. Team velocity improved.' : 'Good Q1 execution. Keep pushing on deliverables.',
           });
         });
-
-        // Q2 achievements — current quarter (in-progress)
-        insertedGoals.forEach((goal: any, i: number) => {
-          const achData = q2Ach[i];
-          achievementsToInsert.push({
-            goal_id: goal.id,
-            cycle_phase: 'q2',
-            status: achData.status,
-            score: achData.score,
-            actual_value: achData.actual_value ?? null,
-            actual_date: ('actual_date' in achData) ? achData.actual_date : null,
-            manager_comment: achData.status === 'completed' ? 'Well done, target achieved ahead of schedule.'
-              : achData.status === 'on_track' ? 'On track — review progress in the next sync.'
-                : '',
+        if (sheetStatus === 'approved') {
+          insertedGoals.forEach((goal: any, i: number) => {
+            achievementsToInsert.push({
+              goal_id: goal.id, cycle_phase: 'q2', status: q2Ach[i].status,
+              score: q2Ach[i].score, actual_value: q2Ach[i].actual_value ?? null,
+              actual_date: ('actual_date' in q2Ach[i]) ? q2Ach[i].actual_date : null,
+              manager_comment: null,
+            });
           });
-        });
-
+        }
         await supabase.from('achievements').insert(achievementsToInsert);
         seededCount++;
-      }
+      }));
 
-      // ── Step 5: Add audit log entries ──
+      // ── Step 5: Add audit log entries + notifications in parallel ──
+      const changedBy = adminProfile?.id || employeeProfile.id;
       const auditEntries = [
-        { entity_type: 'goal_sheet', action: 'SEED_DEMO_DATA', changed_by: adminProfile?.id || employeeProfile.id, new_value: { seeded_employees: seededCount, active_cycle: 'Q2 2026' } },
-        { entity_type: 'cycles', action: 'CYCLE_CREATED', changed_by: adminProfile?.id || employeeProfile.id, new_value: { year: 2026, phases: 'goal_setting, q1, q2, q3, q4', active: 'q2' } },
-        { entity_type: 'profiles', action: 'PROFILES_UPDATED', changed_by: adminProfile?.id || employeeProfile.id, new_value: { departments: ['Product Engineering', 'People & Operations'], managers_assigned: true } },
+        { entity_type: 'goal_sheet', action: 'SEED_DEMO_DATA', changed_by: changedBy, new_value: { seeded_employees: seededCount, active_cycle: 'Q2 2026' } },
+        { entity_type: 'cycles', action: 'CYCLE_CREATED', changed_by: changedBy, new_value: { year: 2026, phases: 'goal_setting, q1, q2, q3, q4', active: 'q2' } },
+        { entity_type: 'profiles', action: 'PROFILES_UPDATED', changed_by: changedBy, new_value: { departments: ['Product Engineering', 'People & Operations'], managers_assigned: true } },
       ];
-      await supabase.from('audit_logs').insert(auditEntries);
-
-      // ── Step 6: Seed demo notifications ──
-      if (seededCount > 0) {
-        const now = new Date();
-        const demoNotifications = [
-          // Employee notifications
-          { user_id: employeeProfile.id, type: 'goal_approved', title: 'Goals Approved', message: 'Your manager has approved your goal sheet for Q2 2026.', is_read: true, action_url: '/employee/goals', created_at: new Date(now.getTime() - 25 * 86400000).toISOString() },
-          { user_id: employeeProfile.id, type: 'checkin_reminder', title: 'Q2 Check-In Reminder', message: 'Please log your Q2 progress for all goals before the end of the quarter.', is_read: false, action_url: '/employee/checkin', created_at: new Date(now.getTime() - 3 * 86400000).toISOString() },
-          { user_id: employeeProfile.id, type: 'system', title: 'Welcome to AtomQuest', message: 'Your performance management portal is ready. Start by reviewing your goals.', is_read: true, action_url: '/employee', created_at: new Date(now.getTime() - 30 * 86400000).toISOString() },
-          // Manager notifications
-          { user_id: managerProfile.id, type: 'goal_submitted', title: 'Goal Sheet Submitted', message: 'Priya Sharma has submitted their goal sheet for approval.', is_read: true, action_url: '/manager/team', created_at: new Date(now.getTime() - 26 * 86400000).toISOString() },
-          { user_id: managerProfile.id, type: 'checkin_reminder', title: 'Team Check-In Review', message: 'Your team has pending Q2 check-ins waiting for your review.', is_read: false, action_url: '/manager/reviews', created_at: new Date(now.getTime() - 2 * 86400000).toISOString() },
-          { user_id: managerProfile.id, type: 'goal_approved', title: 'Your Goals Approved', message: 'Your own goal sheet for Q2 2026 has been approved.', is_read: true, action_url: '/manager/goals', created_at: new Date(now.getTime() - 24 * 86400000).toISOString() },
-        ];
-        if (adminProfile) {
-          demoNotifications.push(
-            { user_id: adminProfile.id, type: 'system', title: 'Demo Data Seeded', message: `${seededCount} employee(s) seeded with goals and achievements.`, is_read: false, action_url: '/admin', created_at: now.toISOString() },
-            { user_id: adminProfile.id, type: 'system', title: 'Q2 Cycle Active', message: 'The Q2 2026 cycle is now active. All employees have approved goal sheets.', is_read: true, action_url: '/admin/analytics', created_at: new Date(now.getTime() - 20 * 86400000).toISOString() },
-          );
-        }
-        await supabase.from('notifications').insert(demoNotifications);
-        toast.success(`Seeded ${seededCount} employee(s) with goals, achievements, and ${demoNotifications.length} notifications!`);
-      } else {
-        toast.success('Demo data already exists — no duplicates created.');
+      const now = new Date();
+      const d = (days: number) => new Date(now.getTime() - days * 86400000).toISOString();
+      const demoNotifications = [
+        { user_id: employeeProfile.id, type: 'goal_approved', title: 'Goals Approved', message: 'Your manager has approved your goal sheet for Q2 2026.', is_read: true, action_url: '/employee/goals', created_at: d(25) },
+        { user_id: employeeProfile.id, type: 'checkin_reminder', title: 'Q2 Check-In Reminder', message: 'Please log your Q2 progress for all goals before the end of the quarter.', is_read: false, action_url: '/employee/checkin', created_at: d(3) },
+        { user_id: employeeProfile.id, type: 'system', title: 'Welcome to AtomQuest', message: 'Your performance management portal is ready. Start by reviewing your goals.', is_read: true, action_url: '/employee', created_at: d(30) },
+        { user_id: managerProfile.id, type: 'goal_submitted', title: 'Goal Sheet Submitted', message: 'Priya Sharma has submitted their goal sheet for approval.', is_read: true, action_url: '/manager/team', created_at: d(26) },
+        { user_id: managerProfile.id, type: 'checkin_reminder', title: 'Team Check-In Review', message: 'Your team has pending Q2 check-ins waiting for your review.', is_read: false, action_url: '/manager/reviews', created_at: d(2) },
+        { user_id: managerProfile.id, type: 'system', title: 'Goal Sheet Pending', message: 'Your goal sheet for Q2 2026 has been submitted and is awaiting approval.', is_read: true, action_url: '/manager/goals', created_at: d(24) },
+      ];
+      if (adminProfile) {
+        demoNotifications.push(
+          { user_id: adminProfile.id, type: 'system', title: 'Demo Data Seeded', message: `${seededCount} employee(s) seeded with goals and achievements.`, is_read: false, action_url: '/admin', created_at: now.toISOString() },
+          { user_id: adminProfile.id, type: 'system', title: 'Q2 Cycle Active', message: 'The Q2 2026 cycle is now active. Manager sheet is pending approval for escalation demo.', is_read: true, action_url: '/admin/analytics', created_at: d(20) },
+        );
       }
+      await Promise.all([
+        supabase.from('audit_logs').insert(auditEntries),
+        supabase.from('notifications').insert(demoNotifications),
+      ]);
+      toast.success(`Seeded ${seededCount} employee(s) with goals, achievements, and ${demoNotifications.length} notifications!`);
       fetchCycles();
     } catch (err: any) {
       console.error(err);
@@ -557,6 +526,19 @@ function GoalUnlock({ user }: { user: any }) {
         old_value: { status: 'approved' },
         new_value: { status: 'draft', reason },
       });
+
+      // Find the employee ID for this sheet to notify them
+      const sheet = sheetsData.find((s: any) => s.id === sheetId);
+      if (sheet && sheet.employee_id) {
+        await notificationService.createNotification({
+          user_id: sheet.employee_id,
+          type: 'system',
+          title: 'Goal Sheet Unlocked',
+          message: `Your manager or admin has unlocked your goal sheet for rework. Reason: ${reason}`,
+          action_url: '/employee/goals'
+        });
+      }
+
       setReason('');
       setSelectedSheet(null);
       searchSheets();

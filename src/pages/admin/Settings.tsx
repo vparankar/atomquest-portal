@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Cycle } from '../../types';
 import { Settings as SettingsIcon, Database, Zap, AlertTriangle, CheckCircle2, Info, MessageSquare, Mail, AlertCircle, Save } from 'lucide-react';
@@ -9,18 +9,51 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
   const [stats, setStats] = useState({ profiles: 0, goalSheets: 0, goals: 0, achievements: 0, auditLogs: 0 });
-  const [teamsEnabled, setTeamsEnabled] = useState(localStorage.getItem('atomquest_teams_enabled') === 'true');
-  const [emailEnabled, setEmailEnabled] = useState(localStorage.getItem('atomquest_email_enabled') === 'true');
+  const [teamsEnabled, setTeamsEnabled] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(false);
 
   const defaultRules = { goalSubmitDays: 7, managerApproveDays: 5, checkinDays: 10, enabled: true };
-  const savedRules = localStorage.getItem('atomquest_escalation_rules');
-  const [escalationRules, setEscalationRules] = useState(savedRules ? JSON.parse(savedRules) : defaultRules);
+  const [escalationRules, setEscalationRules] = useState(defaultRules);
+  const initialEscalationRulesRef = useRef(JSON.stringify(defaultRules));
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const { toast } = useToast();
 
-  const saveEscalationRules = () => {
-    localStorage.setItem('atomquest_escalation_rules', JSON.stringify(escalationRules));
-    toast.success('Escalation rules saved successfully');
+  const saveEscalationRules = async () => {
+    setSavingSettings(true);
+    try {
+      const { error } = await supabase.from('system_settings').upsert({
+        id: 1,
+        escalation_enabled: escalationRules.enabled,
+        goal_submit_days: escalationRules.goalSubmitDays,
+        manager_approve_days: escalationRules.managerApproveDays,
+        checkin_days: escalationRules.checkinDays,
+        updated_at: new Date().toISOString()
+      });
+      if (error) throw error;
+      initialEscalationRulesRef.current = JSON.stringify(escalationRules);
+      toast.success('Escalation rules saved successfully');
+    } catch (err: any) {
+      toast.error('Failed to save settings: ' + err.message);
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const updateIntegration = async (field: 'teams_enabled' | 'email_enabled', value: boolean) => {
+    try {
+      if (field === 'teams_enabled') setTeamsEnabled(value);
+      if (field === 'email_enabled') setEmailEnabled(value);
+      
+      const { error } = await supabase.from('system_settings').update({ [field]: value }).eq('id', 1);
+      if (error) throw error;
+      toast.success(`${field === 'teams_enabled' ? 'Teams' : 'Email'} notifications ${value ? 'enabled' : 'disabled'}`);
+    } catch (err: any) {
+      toast.error('Failed to update integration: ' + err.message);
+      // Revert local state on failure
+      if (field === 'teams_enabled') setTeamsEnabled(!value);
+      if (field === 'email_enabled') setEmailEnabled(!value);
+    }
   };
 
   useEffect(() => { loadSystemInfo(); }, []);
@@ -28,16 +61,30 @@ export function Settings() {
   async function loadSystemInfo() {
     try {
       setLoading(true);
-      const [cycleRes, profilesRes, sheetsRes, goalsRes, achRes, logsRes] = await Promise.all([
+      const [cycleRes, profilesRes, sheetsRes, goalsRes, achRes, logsRes, settingsRes] = await Promise.all([
         supabase.from('cycles').select('*').eq('is_active', true).maybeSingle(),
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('goal_sheets').select('id', { count: 'exact', head: true }),
         supabase.from('goals').select('id', { count: 'exact', head: true }),
         supabase.from('achievements').select('id', { count: 'exact', head: true }),
         supabase.from('audit_logs').select('id', { count: 'exact', head: true }),
+        supabase.from('system_settings').select('*').eq('id', 1).maybeSingle(),
       ]);
       setActiveCycle(cycleRes.data);
       setStats({ profiles: profilesRes.count || 0, goalSheets: sheetsRes.count || 0, goals: goalsRes.count || 0, achievements: achRes.count || 0, auditLogs: logsRes.count || 0 });
+      
+      if (settingsRes.data) {
+        setTeamsEnabled(settingsRes.data.teams_enabled);
+        setEmailEnabled(settingsRes.data.email_enabled);
+        const rules = {
+          enabled: settingsRes.data.escalation_enabled,
+          goalSubmitDays: settingsRes.data.goal_submit_days,
+          managerApproveDays: settingsRes.data.manager_approve_days,
+          checkinDays: settingsRes.data.checkin_days
+        };
+        setEscalationRules(rules);
+        initialEscalationRulesRef.current = JSON.stringify(rules);
+      }
     } catch (err: any) {
       toast.error('Failed to load system info');
     } finally {
@@ -167,11 +214,7 @@ export function Settings() {
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                   <div style={{ position: 'relative' }}>
-                    <input type="checkbox" className="sr-only" checked={teamsEnabled} onChange={(e) => {
-                      setTeamsEnabled(e.target.checked);
-                      localStorage.setItem('atomquest_teams_enabled', String(e.target.checked));
-                      toast.success(`Teams notifications ${e.target.checked ? 'enabled' : 'disabled'}`);
-                    }} />
+                    <input type="checkbox" className="sr-only" checked={teamsEnabled} onChange={(e) => updateIntegration('teams_enabled', e.target.checked)} />
                     <div style={{ width: 36, height: 20, background: teamsEnabled ? 'var(--green)' : '#E5E7EB', borderRadius: 20, transition: 'background-color 0.2s' }}></div>
                     <div style={{ position: 'absolute', top: 2, left: teamsEnabled ? 18 : 2, width: 16, height: 16, background: 'white', borderRadius: '50%', transition: 'left 0.2s' }}></div>
                   </div>
@@ -192,11 +235,7 @@ export function Settings() {
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                   <div style={{ position: 'relative' }}>
-                    <input type="checkbox" className="sr-only" checked={emailEnabled} onChange={(e) => {
-                      setEmailEnabled(e.target.checked);
-                      localStorage.setItem('atomquest_email_enabled', String(e.target.checked));
-                      toast.success(`Email notifications ${e.target.checked ? 'enabled' : 'disabled'}`);
-                    }} />
+                    <input type="checkbox" className="sr-only" checked={emailEnabled} onChange={(e) => updateIntegration('email_enabled', e.target.checked)} />
                     <div style={{ width: 36, height: 20, background: emailEnabled ? 'var(--green)' : '#E5E7EB', borderRadius: 20, transition: 'background-color 0.2s' }}></div>
                     <div style={{ position: 'absolute', top: 2, left: emailEnabled ? 18 : 2, width: 16, height: 16, background: 'white', borderRadius: '50%', transition: 'left 0.2s' }}></div>
                   </div>
@@ -224,7 +263,7 @@ export function Settings() {
           </label>
         </div>
         <div className="card-body">
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Configure when escalation notifications are triggered. These rules are evaluated when an admin runs the escalation check from the Escalations page.</p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>Configure when escalation notifications are triggered. These rules are evaluated when an admin runs the escalation check from the Escalations page or by an automated cron job.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, opacity: escalationRules.enabled ? 1 : 0.5, pointerEvents: escalationRules.enabled ? 'auto' : 'none' }}>
             <div style={{ padding: 16, background: 'var(--surface-raised)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Goal Submission</div>
@@ -252,8 +291,12 @@ export function Settings() {
             </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={saveEscalationRules} className="btn btn-primary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Save size={14} /> Save Rules
+            <button
+              onClick={saveEscalationRules}
+              disabled={savingSettings || JSON.stringify(escalationRules) === initialEscalationRulesRef.current}
+              className="btn btn-primary"
+            >
+              {savingSettings ? 'Saving...' : <><Save size={15} /> Save Rules</>}
             </button>
           </div>
         </div>

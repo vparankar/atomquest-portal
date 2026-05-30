@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useGoalSheet, queryKeys } from '../../hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import type { GoalSheet as GoalSheetType, Goal, Cycle } from '../../types';
 import { Lock, Plus, Trash2, AlertCircle, Info } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
@@ -24,67 +26,29 @@ const statusBadge: Record<string, string> = {
 
 export function GoalSheet() {
   const { user, profile } = useAuth();
+  const queryClient = useQueryClient();
+  const { data: queryData, isLoading: queryLoading } = useGoalSheet(user?.id);
+
   const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
   const [goalSheet, setGoalSheet] = useState<GoalSheetType | null>(null);
   const [goals, setGoals] = useState<Partial<Goal>[]>([]);
-
-  const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
+  // Sync from query data to local state (once, or when query data changes after invalidation)
   useEffect(() => {
-    if (!user) return;
-
-    async function loadData() {
-      try {
-        setLoading(true);
-        // Fetch active cycle
-        const { data: cycleData, error: cycleError } = await supabase
-          .from('cycles')
-          .select('*')
-          .eq('is_active', true)
-          .single();
-
-        if (cycleError) throw cycleError;
-        setActiveCycle(cycleData);
-
-        // Fetch goal sheet if exists
-        if (cycleData) {
-          const { data: sheetData, error: sheetError } = await supabase
-            .from('goal_sheets')
-            .select('*')
-            .eq('employee_id', user!.id)
-            .eq('cycle_id', cycleData.id)
-            .maybeSingle();
-
-          if (sheetError) throw sheetError;
-
-          if (sheetData) {
-            setGoalSheet(sheetData);
-
-            // Fetch goals
-            const { data: goalsData, error: goalsError } = await supabase
-              .from('goals')
-              .select('*')
-              .eq('sheet_id', sheetData.id);
-
-            if (goalsError) throw goalsError;
-            setGoals(goalsData || []);
-          } else {
-            // Start with one empty goal
-            setGoals([createEmptyGoal()]);
-          }
-        }
-      } catch (err: any) {
-        console.error(err);
-        toast.error(err.message || 'Failed to load goal sheet data');
-      } finally {
-        setLoading(false);
-      }
+    if (!queryData) return;
+    setActiveCycle(queryData.activeCycle);
+    setGoalSheet(queryData.goalSheet);
+    if (queryData.goals.length > 0) {
+      setGoals(queryData.goals);
+    } else if (!queryData.goalSheet) {
+      // Start with one empty goal for new sheets
+      setGoals([createEmptyGoal()]);
     }
-
-    loadData();
-  }, [user?.id]);
+    setInitialized(true);
+  }, [queryData]);
 
   const createEmptyGoal = (): Partial<Goal> => ({
     thrust_area: THRUST_AREAS[0],
@@ -225,6 +189,10 @@ export function GoalSheet() {
         new_value: { num_goals: goals.length }
       });
 
+      // Invalidate related caches
+      queryClient.invalidateQueries({ queryKey: queryKeys.goalSheet(user!.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.employeeStats(user!.id) });
+
       toast.success('Goals submitted successfully!');
 
       if (profile?.manager_id) {
@@ -252,7 +220,7 @@ export function GoalSheet() {
     }
   };
 
-  if (loading) {
+  if (queryLoading && !initialized) {
     return <div style={{ padding: 32 }}><Spinner /></div>;
   }
 

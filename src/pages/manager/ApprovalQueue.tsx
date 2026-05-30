@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { useApprovalQueue } from '../../hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/queries';
 import type { GoalSheet, Goal, Profile } from '../../types';
 import { Check, X, MessageSquare } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
@@ -14,36 +17,44 @@ interface GoalSheetWithRelations extends GoalSheet {
 
 export function ApprovalQueue() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
-  const [sheets, setSheets] = useState<GoalSheetWithRelations[]>([]);
-  const [loading, setLoading] = useState(true);
   const [reworkSheetId, setReworkSheetId] = useState<string | null>(null);
   const [reworkComment, setReworkComment] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchSheets = async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const statusFilter = activeTab === 'pending' ? 'submitted' : 'approved';
-      const { data, error } = await supabase.from('goal_sheets').select('*, profiles!goal_sheets_employee_id_fkey!inner(*), goals(*)').eq('status', statusFilter).eq('profiles.manager_id', user.id).order('created_at', { ascending: false });
-      if (error) throw error;
-      setSheets((data as any) || []);
-    } catch { toast.error('Failed to fetch approval queue.'); } finally { setLoading(false); }
-  };
+  const statusFilter = activeTab === 'pending' ? 'submitted' : 'approved';
+  const { data: sheetsRaw, isLoading: loading } = useApprovalQueue(user?.id, statusFilter);
+  
+  // Use local state for inline edits (weightage/target adjustments)
+  const [localEdits, setLocalEdits] = useState<Record<string, Record<string, Partial<Goal>>>>({});
 
-  useEffect(() => { fetchSheets(); }, [user, activeTab]);
+  const getSheetGoals = (sheet: GoalSheetWithRelations): Goal[] => {
+    return sheet.goals.map(g => ({
+      ...g,
+      ...(localEdits[sheet.id]?.[g.id] || {}),
+    }));
+  };
 
   const updateGoal = (sheetId: string, goalId: string, field: keyof Goal, value: any) => {
-    setSheets(sheets.map(s => s.id === sheetId ? { ...s, goals: s.goals.map(g => g.id === goalId ? { ...g, [field]: value } : g) } : s));
+    setLocalEdits(prev => ({
+      ...prev,
+      [sheetId]: {
+        ...(prev[sheetId] || {}),
+        [goalId]: {
+          ...(prev[sheetId]?.[goalId] || {}),
+          [field]: value,
+        },
+      },
+    }));
   };
 
-  const validateSheet = (sheet: GoalSheetWithRelations) => {
-    const total = sheet.goals.reduce((s, g) => s + (Number(g.weightage) || 0), 0);
+  const validateSheet = (goals: Goal[]) => {
+    const total = goals.reduce((s, g) => s + (Number(g.weightage) || 0), 0);
     if (total !== 100) return 'Total weightage must be exactly 100%';
-    for (let i = 0; i < sheet.goals.length; i++) {
-      const g = sheet.goals[i];
+    for (let i = 0; i < goals.length; i++) {
+      const g = goals[i];
       if (!g.weightage || g.weightage < 10 || g.weightage > 90) return `Goal ${i + 1}: Weightage must be 10–90%`;
       if (g.uom_type === 'timeline' && !g.target_date) return `Goal ${i + 1}: Target date required`;
       if (g.uom_type !== 'timeline' && (g.target_value === undefined || g.target_value === null || isNaN(Number(g.target_value)))) return `Goal ${i + 1}: Target value required`;
@@ -52,18 +63,24 @@ export function ApprovalQueue() {
   };
 
   const handleApprove = async (sheet: GoalSheetWithRelations) => {
-    const err = validateSheet(sheet);
+    const goals = getSheetGoals(sheet);
+    const err = validateSheet(goals);
     if (err) { toast.error(err); return; }
     setSavingId(sheet.id);
     try {
-      for (const g of sheet.goals) {
+      for (const g of goals) {
         const { error } = await supabase.from('goals').update({ weightage: g.weightage, target_value: g.target_value, target_date: g.target_date }).eq('id', g.id);
         if (error) throw error;
       }
       const { error } = await supabase.from('goal_sheets').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: user!.id }).eq('id', sheet.id);
       if (error) throw error;
       await supabase.from('audit_logs').insert({ entity_type: 'goal_sheet', entity_id: sheet.id, action: 'APPROVE_GOAL_SHEET', changed_by: user!.id });
-      setSheets(sheets.filter(s => s.id !== sheet.id));
+      
+      // Invalidate cache
+      queryClient.invalidateQueries({ queryKey: queryKeys.approvalQueue(user!.id, 'submitted') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.approvalQueue(user!.id, 'approved') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.managerStats(user!.id) });
+      
       toast.success('Sheet approved');
       
       await notificationService.createNotification({
@@ -90,11 +107,15 @@ export function ApprovalQueue() {
       const { error } = await supabase.from('goal_sheets').update({ status: 'rework', manager_comment: reworkComment }).eq('id', reworkSheetId);
       if (error) throw error;
       await supabase.from('audit_logs').insert({ entity_type: 'goal_sheet', entity_id: reworkSheetId, action: 'RETURN_FOR_REWORK', changed_by: user!.id, new_value: { comment: reworkComment } });
-      setSheets(sheets.filter(s => s.id !== reworkSheetId));
+      
+      // Invalidate cache
+      queryClient.invalidateQueries({ queryKey: queryKeys.approvalQueue(user!.id, 'submitted') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.managerStats(user!.id) });
+
+      const sheet = (sheetsRaw as GoalSheetWithRelations[] | undefined)?.find(s => s.id === reworkSheetId);
       setReworkSheetId(null); setReworkComment('');
       toast.success('Sheet returned for rework');
 
-      const sheet = sheets.find(s => s.id === reworkSheetId);
       if (sheet) {
         await notificationService.createNotification({
           user_id: sheet.employee_id,
@@ -106,6 +127,8 @@ export function ApprovalQueue() {
       }
     } catch { toast.error('Failed.'); } finally { setSavingId(null); }
   };
+
+  const sheets = (sheetsRaw || []) as GoalSheetWithRelations[];
 
   if (loading && sheets.length === 0) return <div style={{ padding: 32 }}><Spinner /></div>;
 
@@ -119,7 +142,7 @@ export function ApprovalQueue() {
       {/* Tabs */}
       <div className="tab-nav" style={{ marginBottom: 20 }}>
         {(['pending', 'approved'] as const).map(t => (
-          <button key={t} onClick={() => setActiveTab(t)} className={`tab-btn${activeTab === t ? ' tab-btn-active' : ''}`}>
+          <button key={t} onClick={() => { setActiveTab(t); setLocalEdits({}); }} className={`tab-btn${activeTab === t ? ' tab-btn-active' : ''}`}>
             {t === 'pending' ? 'Pending Approvals' : 'Approved'}
           </button>
         ))}
@@ -137,7 +160,8 @@ export function ApprovalQueue() {
         )}
 
         {sheets.map(sheet => {
-          const totalW = sheet.goals.reduce((s, g) => s + (Number(g.weightage) || 0), 0);
+          const goals = getSheetGoals(sheet);
+          const totalW = goals.reduce((s, g) => s + (Number(g.weightage) || 0), 0);
           const isPending = activeTab === 'pending';
           return (
             <div key={sheet.id} className="card">
@@ -145,7 +169,7 @@ export function ApprovalQueue() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{sheet.profiles.full_name || 'Unknown'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Submitted {new Date(sheet.created_at || '').toLocaleDateString()}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Submitted {new Date(sheet.submitted_at || sheet.created_at || '').toLocaleDateString()}</div>
                 </div>
                 {isPending && (
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -168,7 +192,7 @@ export function ApprovalQueue() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sheet.goals.map(goal => (
+                    {goals.map(goal => (
                       <tr key={goal.id} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ padding: '10px 16px', color: 'var(--text-secondary)' }}>{goal.thrust_area}</td>
                         <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text)' }}>
