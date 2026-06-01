@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { sendNotificationEmail } from './emailService';
 import type { Notification } from '../types';
 
 export const notificationService = {
@@ -52,6 +53,42 @@ export const notificationService = {
       console.error('Error creating notification:', error);
       return false;
     }
+
+    // Fire-and-forget: send email if enabled (never blocks UI)
+    this._trySendEmail(notification);
+
     return true;
-  }
+  },
+
+  /** Internal: check if email is enabled, resolve recipient, and send. */
+  async _trySendEmail(notification: Omit<Notification, 'id' | 'created_at' | 'is_read'>) {
+    try {
+      // Check system setting
+      const { data: settings } = await supabase
+        .from('system_settings')
+        .select('email_enabled')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (!settings?.email_enabled) return;
+
+      // Resolve recipient name/role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, role')
+        .eq('id', notification.user_id)
+        .maybeSingle();
+
+      await sendNotificationEmail({
+        title: notification.title,
+        message: notification.message,
+        recipientName: profile?.full_name || 'Unknown User',
+        recipientRole: profile?.role || 'employee',
+        notificationType: notification.type,
+        actionUrl: notification.action_url,
+      });
+    } catch (err) {
+      console.warn('Email dispatch failed (non-blocking):', err);
+    }
+  },
 };

@@ -241,7 +241,7 @@ export function Settings() {
                   </div>
                 </label>
               </div>
-              {emailEnabled && <div style={{ fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> SMTP Configured</div>}
+              {emailEnabled && <div style={{ fontSize: 12, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> Resend API Connected</div>}
             </div>
           </div>
         </div>
