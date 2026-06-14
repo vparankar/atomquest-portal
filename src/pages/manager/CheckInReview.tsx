@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import type { Cycle, Profile, Goal, Achievement } from '../../types';
+import { useCheckInReview, queryKeys } from '../../hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import type { Profile, Goal, Achievement } from '../../types';
 import { ChevronDown, ChevronUp, Save, MessageSquare, Users } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
@@ -18,62 +20,30 @@ const statusClass: Record<string, string> = {
 
 export function CheckInReview() {
   const { user } = useAuth();
-  const [activeCycle, setActiveCycle] = useState<Cycle | null>(null);
-  const [teamCheckIns, setTeamCheckIns] = useState<TeamMemberCheckIn[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data, isLoading: loading } = useCheckInReview(user?.id);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [commentsInitialized, setCommentsInitialized] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => { if (user) loadData(); }, [user?.id]);
-
-  async function loadData() {
-    try {
-      setLoading(true);
-      const { data: cycleData, error: cycleError } = await supabase.from('cycles').select('*').eq('is_active', true).single();
-      if (cycleError) throw cycleError;
-      if (!cycleData) { setLoading(false); return; }
-      setActiveCycle(cycleData);
-
-      const { data: teamData, error: teamError } = await supabase.from('profiles').select('*').eq('manager_id', user!.id);
-      if (teamError) throw teamError;
-
-      if (teamData && teamData.length > 0) {
-        const teamIds = teamData.map(t => t.id);
-        const { data: sheetsData } = await supabase.from('goal_sheets').select('id,employee_id').eq('cycle_id', cycleData.id).eq('status', 'approved').in('employee_id', teamIds);
-        const sheetIds = sheetsData?.map(s => s.id) || [];
-        const { data: goalsData } = await supabase.from('goals').select('*').in('sheet_id', sheetIds);
-        const goalIds = goalsData?.map(g => g.id) || [];
-        const { data: achievementsData } = await supabase.from('achievements').select('*').eq('cycle_phase', cycleData.phase).in('goal_id', goalIds);
-        const initialComments: Record<string, string> = {};
-        const merged = teamData.map(member => {
-          const memberSheet = sheetsData?.find(s => s.employee_id === member.id);
-          const memberGoals = memberSheet ? (goalsData?.filter(g => g.sheet_id === memberSheet.id) || []) : [];
-          let allCompleted = true;
-          const hasGoals = memberGoals.length > 0;
-          const goalsWithAch = memberGoals.map(g => {
-            const ach = achievementsData?.find(a => a.goal_id === g.id);
-            if (!ach || ach.status !== 'completed') allCompleted = false;
-            if (ach) initialComments[ach.id] = ach.manager_comment || '';
-            return { ...g, achievement: ach };
-          });
-          return { ...member, goals: goalsWithAch, overallStatus: (hasGoals && allCompleted) ? 'completed' : 'pending' } as TeamMemberCheckIn;
-        });
-        setComments(initialComments);
-        setTeamCheckIns(merged);
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to load');
-    } finally { setLoading(false); }
+  // Sync initial comments from the query data (only once)
+  if (data?.initialComments && !commentsInitialized) {
+    setComments(data.initialComments);
+    setCommentsInitialized(true);
   }
+
+  const activeCycle = data?.activeCycle;
+  const teamCheckIns = (data?.teamCheckIns || []) as TeamMemberCheckIn[];
 
   const saveComment = async (achievementId: string) => {
     setSavingId(achievementId);
     try {
       const { error } = await supabase.from('achievements').update({ manager_comment: comments[achievementId] }).eq('id', achievementId);
       if (error) throw error;
-      setTeamCheckIns(prev => prev.map(m => ({ ...m, goals: m.goals.map(g => g.achievement?.id === achievementId ? { ...g, achievement: { ...g.achievement!, manager_comment: comments[achievementId] } } : g) })));
+      // Invalidate cache so data refreshes
+      queryClient.invalidateQueries({ queryKey: queryKeys.checkInReview(user!.id) });
       toast.success('Comment saved');
     } catch { toast.error('Failed to save comment'); } finally { setSavingId(null); }
   };
@@ -144,7 +114,9 @@ export function CheckInReview() {
                                 {member.goals.map(goal => (
                                   <tr key={goal.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                     <td style={{ padding: '10px 14px', width: '22%' }}>
-                                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{goal.title}</div>
+                                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>
+                                        {goal.title}
+                                      </div>
                                       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{goal.thrust_area}</div>
                                     </td>
                                     <td style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>

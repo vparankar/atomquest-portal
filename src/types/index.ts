@@ -74,3 +74,14 @@ export interface AuditLog {
   details?: Record<string, any>;
   created_at?: string;
 }
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: 'goal_submitted' | 'goal_approved' | 'goal_rejected' | 'checkin_reminder' | 'escalation' | 'system';
+  title: string;
+  message: string;
+  is_read: boolean;
+  action_url?: string;
+  created_at?: string;
+}

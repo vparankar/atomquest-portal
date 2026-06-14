@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import type { Cycle, Profile } from '../../types';
+import { useCycles, useApprovedSheets, useEmployees, useAuditLogs } from '../../hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import type { Cycle } from '../../types';
 import { Spinner } from '../../components/Spinner';
 import { useToast } from '../../components/Toast';
+import * as XLSX from 'xlsx';
+import { Download } from 'lucide-react';
+import { notificationService } from '../../lib/notifications';
 
 export function AdminPanel() {
   const { user } = useAuth();
@@ -17,7 +22,8 @@ export function AdminPanel() {
       </div>
 
       <div className="card">
-        <div className="tab-nav" style={{ padding: '0 20px' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <div className="tab-nav" style={{ padding: '0 20px', minWidth: 'max-content' }}>
           {[
             { id: 'cycles', name: 'Cycle Management' },
             { id: 'unlock', name: 'Goal Unlock' },
@@ -32,6 +38,7 @@ export function AdminPanel() {
               {tab.name}
             </button>
           ))}
+          </div>
         </div>
 
         <div style={{ padding: 24 }}>
@@ -48,8 +55,9 @@ export function AdminPanel() {
 // ─── Cycle Management ────────────────────────────────────────────────────────
 
 function CycleManagement() {
-  const [cycles, setCycles] = useState<Cycle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: cycles = [], isLoading: loading } = useCycles();
+  const queryClient = useQueryClient();
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [year, setYear] = useState(new Date().getFullYear());
   const [phase, setPhase] = useState<Cycle['phase']>('goal_setting');
@@ -58,39 +66,72 @@ function CycleManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchCycles();
-  }, []);
+  const fetchCycles = () => queryClient.invalidateQueries({ queryKey: ['cycles'] });
 
-  const fetchCycles = async () => {
-    const { data, error } = await supabase
-      .from('cycles')
-      .select('*')
-      .order('year', { ascending: false })
-
-    if (!error && data) setCycles(data);
-    setLoading(false);
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const { error } = await supabase.from('cycles').insert({
-      year,
-      phase,
-      opens_at: opensAt,
-      closes_at: closesAt,
-      is_active: false,
-    });
-    setIsSubmitting(false);
-    if (!error) {
-      setOpensAt('');
-      setClosesAt('');
-      fetchCycles();
-      toast.success('Cycle created successfully');
+    if (editingId) {
+      const { error } = await supabase.from('cycles').update({
+        year,
+        phase,
+        opens_at: opensAt,
+        closes_at: closesAt,
+      }).eq('id', editingId);
+      setIsSubmitting(false);
+      if (!error) {
+        handleCancelEdit();
+        fetchCycles();
+        toast.success('Cycle updated successfully');
+      } else {
+        toast.error('Error updating cycle: ' + error.message);
+      }
     } else {
-      toast.error('Error creating cycle: ' + error.message);
+      const { error } = await supabase.from('cycles').insert({
+        year,
+        phase,
+        opens_at: opensAt,
+        closes_at: closesAt,
+        is_active: false,
+      });
+      setIsSubmitting(false);
+      if (!error) {
+        setOpensAt('');
+        setClosesAt('');
+        fetchCycles();
+        toast.success('Cycle created successfully');
+      } else {
+        toast.error('Error creating cycle: ' + error.message);
+      }
     }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this cycle?')) return;
+    const { error } = await supabase.from('cycles').delete().eq('id', id);
+    if (!error) {
+      fetchCycles();
+      toast.success('Cycle deleted successfully');
+    } else {
+      toast.error('Error deleting cycle: ' + error.message);
+    }
+  };
+
+  const handleEdit = (cycle: Cycle) => {
+    setEditingId(cycle.id);
+    setYear(cycle.year);
+    setPhase(cycle.phase);
+    setOpensAt(cycle.opens_at ? cycle.opens_at.split('T')[0] : '');
+    setClosesAt(cycle.closes_at ? cycle.closes_at.split('T')[0] : '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setYear(new Date().getFullYear());
+    setPhase('goal_setting');
+    setOpensAt('');
+    setClosesAt('');
   };
 
   const handleSeedData = async () => {
@@ -116,26 +157,30 @@ function CycleManagement() {
 
       // ── Step 2: Set departments & manager assignments on profiles ──
       const profileUpdates = [
-        { id: employeeProfile.id, full_name: 'Alice Johnson', department: 'Engineering', manager_id: managerProfile.id },
-        { id: managerProfile.id, full_name: 'Bob Smith', department: 'Engineering', manager_id: null },
+        { id: employeeProfile.id, full_name: 'Priya Sharma', department: 'Product Engineering', manager_id: managerProfile.id },
+        { id: managerProfile.id, full_name: 'Rajesh Nair', department: 'Product Engineering', manager_id: managerProfile.id },
       ];
       if (adminProfile) {
-        profileUpdates.push({ id: adminProfile.id, full_name: 'Carol Admin', department: 'Operations', manager_id: null });
+        profileUpdates.push({ id: adminProfile.id, full_name: 'Anita Desai', department: 'People & Operations', manager_id: null });
       }
 
-      for (const upd of profileUpdates) {
-        await supabase.from('profiles').update({
+      await Promise.all(profileUpdates.map(upd =>
+        supabase.from('profiles').update({
           full_name: upd.full_name,
           department: upd.department,
           manager_id: upd.manager_id,
-        }).eq('id', upd.id);
-      }
+        }).eq('id', upd.id)
+      ));
 
-      // ── Step 3: Create cycles for 2026 (idempotent) ──
+      // Nuclear reset: wipe all transactional data server-side via RPC
+      const { error: resetErr } = await supabase.rpc('reset_demo_data');
+      if (resetErr) throw new Error('Failed to reset data: ' + resetErr.message);
+
+      // ── Step 3: Create cycles for 2026 — Q2 is active (current quarter) ──
       const cycleDefinitions = [
         { year: 2026, phase: 'goal_setting' as const, opens_at: '2025-12-01', closes_at: '2025-12-31', is_active: false },
-        { year: 2026, phase: 'q1' as const, opens_at: '2026-01-01', closes_at: '2026-03-31', is_active: true },
-        { year: 2026, phase: 'q2' as const, opens_at: '2026-04-01', closes_at: '2026-06-30', is_active: false },
+        { year: 2026, phase: 'q1' as const, opens_at: '2026-01-01', closes_at: '2026-03-31', is_active: false },
+        { year: 2026, phase: 'q2' as const, opens_at: '2026-04-01', closes_at: '2026-06-30', is_active: true },
         { year: 2026, phase: 'q3' as const, opens_at: '2026-07-01', closes_at: '2026-09-30', is_active: false },
         { year: 2026, phase: 'q4' as const, opens_at: '2026-10-01', closes_at: '2026-12-31', is_active: false },
       ];
@@ -144,12 +189,11 @@ function CycleManagement() {
       await supabase.from('cycles').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000');
 
       const cycleIds: Record<string, string> = {};
-      for (const cd of cycleDefinitions) {
+      await Promise.all(cycleDefinitions.map(async (cd) => {
         const { data: existing } = await supabase
           .from('cycles').select('id')
           .eq('year', cd.year).eq('phase', cd.phase)
           .maybeSingle();
-
         if (existing) {
           await supabase.from('cycles').update({ is_active: cd.is_active, opens_at: cd.opens_at, closes_at: cd.closes_at }).eq('id', existing.id);
           cycleIds[cd.phase] = existing.id;
@@ -159,137 +203,172 @@ function CycleManagement() {
           if (error) throw error;
           cycleIds[cd.phase] = newCycle.id;
         }
+      }));
+
+      const q2CycleId = cycleIds['q2'];
+
+      // ── Step 3.5: Create a master shared goal ──
+      let sharedMasterGoalId: string | null = null;
+      const { data: existingMaster } = await supabase.from('goals').select('id').eq('is_shared', true).eq('title', 'Company-Wide Cost Optimization').maybeSingle();
+      if (existingMaster) {
+        sharedMasterGoalId = existingMaster.id;
+      } else {
+        const { data: newMaster, error: masterErr } = await supabase.from('goals').insert({
+          thrust_area: 'Cost',
+          title: 'Company-Wide Cost Optimization',
+          description: 'Reduce overall operational expenditures by 10% across all departments through resource optimization.',
+          uom_type: 'min',
+          target_value: 10,
+          status: 'not_started',
+          is_shared: true,
+        }).select().single();
+        if (masterErr) throw masterErr;
+        sharedMasterGoalId = newMaster.id;
       }
 
-      const activeCycleId = cycleIds['q1'];
-
-      // ── Step 4: Seed goal sheets, goals, and achievements for each employee ──
+      // ── Step 4: Seed goal sheets & goals for Q2 (active cycle) ──
       const employees = allProfiles.filter(p => p.role === 'employee' || p.role === 'manager');
 
-      const goalTemplates = [
-        { thrust_area: 'Revenue', title: 'Increase Q1 Sales Revenue by 15%', uom_type: 'min' as const, target_value: 1000000, weightage: 25 },
-        { thrust_area: 'Customer', title: 'Achieve NPS Score of 80+', uom_type: 'min' as const, target_value: 80, weightage: 20 },
-        { thrust_area: 'Process', title: 'Complete Compliance Training', uom_type: 'timeline' as const, target_date: '2026-03-15', weightage: 15 },
-        { thrust_area: 'Quality', title: 'Reduce Bug Escape Rate Below 5%', uom_type: 'max' as const, target_value: 5, weightage: 15 },
-        { thrust_area: 'People', title: 'Mentor 2 Junior Team Members', uom_type: 'min' as const, target_value: 2, weightage: 15 },
-        { thrust_area: 'Cost', title: 'Cut Infrastructure Costs by 10%', uom_type: 'min' as const, target_value: 10, weightage: 10 },
+      // Role-specific goal templates — employee vs manager get different goals
+      const employeeGoalTemplates = [
+        { thrust_area: 'Revenue', title: 'Drive Smart Fan SKU Revenue to ₹12Cr', description: 'Expand the Efficio and Renesa Pro product lines across Tier-2 markets, focusing on dealer activations and Amazon A+ listings.', uom_type: 'min' as const, target_value: 12, weightage: 25 },
+        { thrust_area: 'Customer', title: 'Achieve Product NPS of 75+', description: 'Improve after-sales service response time, resolve warranty claims within 48 hours, and implement customer feedback loops.', uom_type: 'min' as const, target_value: 75, weightage: 20 },
+        { thrust_area: 'Process', title: 'Deliver IoT Hub Firmware v3.0', description: 'Complete the BLE mesh networking module and OTA update mechanism for the Atomberg IoT ecosystem by end of Q2.', uom_type: 'timeline' as const, target_date: '2026-06-15', weightage: 20 },
+        { thrust_area: 'Quality', title: 'Reduce Field Return Rate Below 2%', description: 'Implement automated end-of-line testing for BLDC motor assemblies and tighten incoming QC for PCB batches.', uom_type: 'max' as const, target_value: 2, weightage: 15 },
+        { thrust_area: 'People', title: 'Mentor 2 Graduate Trainees', description: 'Onboard and mentor new campus hires on the embedded firmware team through structured 90-day learning paths.', uom_type: 'min' as const, target_value: 2, weightage: 10 },
+        { thrust_area: 'Cost', title: 'Company-Wide Cost Optimization', description: 'Reduce overall operational expenditures by 10% across all departments through resource optimization.', uom_type: 'min' as const, target_value: 10, weightage: 10, is_shared: true },
       ];
 
-      // Achievement data per quarter — varied scores for realistic analytics
-      const achievementSets: Record<string, { score: number; status: string; actual_value?: number; actual_date?: string }[]> = {
-        q1: [
-          { score: 85, status: 'on_track', actual_value: 850000 },
-          { score: 78, status: 'on_track', actual_value: 78 },
-          { score: 100, status: 'completed', actual_date: '2026-03-10' },
-          { score: 60, status: 'on_track', actual_value: 8 },
-          { score: 50, status: 'on_track', actual_value: 1 },
-          { score: 70, status: 'on_track', actual_value: 7 },
-        ],
-        q2: [
-          { score: 92, status: 'on_track', actual_value: 920000 },
-          { score: 82, status: 'on_track', actual_value: 82 },
-          { score: 100, status: 'completed', actual_date: '2026-03-10' },
-          { score: 80, status: 'on_track', actual_value: 4 },
-          { score: 100, status: 'completed', actual_value: 2 },
-          { score: 85, status: 'on_track', actual_value: 8.5 },
-        ],
-        q3: [
-          { score: 70, status: 'on_track', actual_value: 700000 },
-          { score: 88, status: 'on_track', actual_value: 88 },
-          { score: 100, status: 'completed', actual_date: '2026-03-10' },
-          { score: 90, status: 'on_track', actual_value: 3 },
-          { score: 100, status: 'completed', actual_value: 2 },
-          { score: 95, status: 'completed', actual_value: 9.5 },
-        ],
-        q4: [
-          { score: 105, status: 'completed', actual_value: 1050000 },
-          { score: 90, status: 'completed', actual_value: 90 },
-          { score: 100, status: 'completed', actual_date: '2026-03-10' },
-          { score: 100, status: 'completed', actual_value: 2 },
-          { score: 100, status: 'completed', actual_value: 2 },
-          { score: 100, status: 'completed', actual_value: 10 },
-        ],
-      };
+      const managerGoalTemplates = [
+        { thrust_area: 'Revenue', title: 'Grow Engineering-Led Revenue to ₹45Cr', description: 'Deliver 3 new product variants (mixer grinder, water heater smart) and support GTM with technical demos and channel training.', uom_type: 'min' as const, target_value: 45, weightage: 25 },
+        { thrust_area: 'Customer', title: 'Maintain Support SLA at 95%+', description: 'Ensure the engineering support team resolves L2/L3 escalations within committed timelines and maintains CSAT above target.', uom_type: 'min' as const, target_value: 95, weightage: 15 },
+        { thrust_area: 'Process', title: 'Launch CI/CD Pipeline for Firmware', description: 'Implement automated build, test, and deploy pipelines for all embedded firmware repositories using GitHub Actions and hardware-in-the-loop testing.', uom_type: 'timeline' as const, target_date: '2026-05-31', weightage: 20 },
+        { thrust_area: 'Quality', title: 'Achieve Zero Critical Bugs in Production', description: 'Implement static analysis gates, mandatory code reviews, and staging environment validation for all firmware releases.', uom_type: 'zero' as const, target_value: 0, weightage: 15 },
+        { thrust_area: 'People', title: 'Build Team Capacity to 12 Engineers', description: 'Hire 4 senior embedded/IoT engineers, conduct structured onboarding, and achieve less than 10% attrition in the engineering team.', uom_type: 'min' as const, target_value: 12, weightage: 15 },
+        { thrust_area: 'Cost', title: 'Company-Wide Cost Optimization', description: 'Reduce overall operational expenditures by 10% across all departments through resource optimization.', uom_type: 'min' as const, target_value: 10, weightage: 10, is_shared: true },
+      ];
+
+      // Q1 completed achievement data (historical)
+      const q1Achievements_employee = [
+        { score: 88, status: 'completed' as const, actual_value: 10.5 },
+        { score: 72, status: 'on_track' as const, actual_value: 72 },
+        { score: 100, status: 'completed' as const, actual_date: '2026-03-12' },
+        { score: 75, status: 'on_track' as const, actual_value: 3.2 },
+        { score: 50, status: 'on_track' as const, actual_value: 1 },
+        { score: 90, status: 'on_track' as const, actual_value: 9 },
+      ];
+
+      const q1Achievements_manager = [
+        { score: 82, status: 'on_track' as const, actual_value: 37 },
+        { score: 93, status: 'completed' as const, actual_value: 93 },
+        { score: 100, status: 'completed' as const, actual_date: '2026-03-28' },
+        { score: 100, status: 'completed' as const, actual_value: 0 },
+        { score: 75, status: 'on_track' as const, actual_value: 9 },
+        { score: 100, status: 'completed' as const, actual_value: 13 },
+      ];
+
+      // Q2 in-progress achievement data (current quarter)
+      const q2Achievements_employee = [
+        { score: 45, status: 'on_track' as const, actual_value: 5.4 },
+        { score: 68, status: 'on_track' as const, actual_value: 68 },
+        { score: 0, status: 'not_started' as const },
+        { score: 80, status: 'on_track' as const, actual_value: 2.5 },
+        { score: 100, status: 'completed' as const, actual_value: 2 },
+        { score: 60, status: 'on_track' as const, actual_value: 6 },
+      ];
+
+      const q2Achievements_manager = [
+        { score: 38, status: 'on_track' as const, actual_value: 17 },
+        { score: 96, status: 'completed' as const, actual_value: 96 },
+        { score: 100, status: 'completed' as const, actual_date: '2026-05-20' },
+        { score: 100, status: 'completed' as const, actual_value: 0 },
+        { score: 83, status: 'on_track' as const, actual_value: 10 },
+        { score: 100, status: 'completed' as const, actual_value: 10 },
+      ];
 
       let seededCount = 0;
-      for (const emp of employees) {
-        // Check if goal sheet already exists for this cycle
-        const { data: existingSheet } = await supabase
-          .from('goal_sheets').select('id')
-          .eq('employee_id', emp.id).eq('cycle_id', activeCycleId)
-          .maybeSingle();
+      await Promise.all(employees.map(async (emp) => {
+        const isManager = emp.role === 'manager';
+        const templates = isManager ? managerGoalTemplates : employeeGoalTemplates;
+        const q1Ach = isManager ? q1Achievements_manager : q1Achievements_employee;
+        const q2Ach = isManager ? q2Achievements_manager : q2Achievements_employee;
+        const sheetStatus = isManager ? 'submitted' : 'approved';
 
-        if (existingSheet) continue;
-
-        // Create goal sheet
         const { data: newSheet, error: sheetErr } = await supabase
           .from('goal_sheets')
           .insert({
-            employee_id: emp.id,
-            cycle_id: activeCycleId,
-            status: 'approved',
-            submitted_at: new Date().toISOString(),
-            approved_at: new Date().toISOString(),
+            employee_id: emp.id, cycle_id: q2CycleId, status: sheetStatus,
+            submitted_at: '2026-04-02T10:00:00Z',
+            ...(sheetStatus === 'approved' ? { approved_at: '2026-04-03T14:30:00Z' } : {})
           })
           .select().single();
-
         if (sheetErr) throw sheetErr;
 
-        // Create goals
-        const goalsToInsert = goalTemplates.map(gt => ({
-          sheet_id: newSheet.id,
-          thrust_area: gt.thrust_area,
-          title: gt.title,
-          uom_type: gt.uom_type,
+        const goalsToInsert = templates.map(gt => ({
+          sheet_id: newSheet.id, thrust_area: gt.thrust_area, title: gt.title,
+          description: gt.description, uom_type: gt.uom_type,
           target_value: gt.target_value ?? null,
           target_date: ('target_date' in gt) ? gt.target_date : null,
-          weightage: gt.weightage,
-          status: 'on_track' as const,
+          weightage: gt.weightage, status: 'on_track' as const,
+          is_shared: ('is_shared' in gt) ? gt.is_shared : false,
+          shared_from: ('is_shared' in gt && gt.is_shared) ? sharedMasterGoalId : null,
         }));
 
         const { data: insertedGoals, error: goalsErr } = await supabase
           .from('goals').insert(goalsToInsert).select();
-
         if (goalsErr) throw goalsErr;
 
-        // Create achievements for each goal across all 4 quarters
         const achievementsToInsert: any[] = [];
-        for (const phase of ['q1', 'q2', 'q3', 'q4']) {
-          const phaseAch = achievementSets[phase];
+        insertedGoals.forEach((goal: any, i: number) => {
+          achievementsToInsert.push({
+            goal_id: goal.id, cycle_phase: 'q1', status: q1Ach[i].status,
+            score: q1Ach[i].score, actual_value: q1Ach[i].actual_value ?? null,
+            actual_date: ('actual_date' in q1Ach[i]) ? q1Ach[i].actual_date : null,
+            manager_comment: isManager ? 'Solid Q1 leadership. Team velocity improved.' : 'Good Q1 execution. Keep pushing on deliverables.',
+          });
+        });
+        if (sheetStatus === 'approved') {
           insertedGoals.forEach((goal: any, i: number) => {
-            const achData = phaseAch[i];
             achievementsToInsert.push({
-              goal_id: goal.id,
-              cycle_phase: phase,
-              status: achData.status,
-              score: achData.score,
-              actual_value: achData.actual_value ?? null,
-              actual_date: achData.actual_date ?? null,
-              manager_comment: phase === 'q1' ? 'Good start to the year.' :
-                phase === 'q2' ? 'Strong mid-year progress.' :
-                phase === 'q3' ? 'Keep the momentum going.' :
-                'Excellent year-end performance!',
+              goal_id: goal.id, cycle_phase: 'q2', status: q2Ach[i].status,
+              score: q2Ach[i].score, actual_value: q2Ach[i].actual_value ?? null,
+              actual_date: ('actual_date' in q2Ach[i]) ? q2Ach[i].actual_date : null,
+              manager_comment: null,
             });
           });
         }
-
         await supabase.from('achievements').insert(achievementsToInsert);
         seededCount++;
-      }
+      }));
 
-      // ── Step 5: Add audit log entries ──
+      // ── Step 5: Add audit log entries + notifications in parallel ──
+      const changedBy = adminProfile?.id || employeeProfile.id;
       const auditEntries = [
-        { entity_type: 'goal_sheet', action: 'SEED_DEMO_DATA', changed_by: adminProfile?.id || employeeProfile.id, new_value: { seeded_employees: seededCount } },
-        { entity_type: 'cycles', action: 'CYCLE_CREATED', changed_by: adminProfile?.id || employeeProfile.id, new_value: { year: 2026, phases: 'goal_setting, q1, q2, q3, q4' } },
-        { entity_type: 'profiles', action: 'PROFILES_UPDATED', changed_by: adminProfile?.id || employeeProfile.id, new_value: { departments_set: true, managers_assigned: true } },
+        { entity_type: 'goal_sheet', action: 'SEED_DEMO_DATA', changed_by: changedBy, new_value: { seeded_employees: seededCount, active_cycle: 'Q2 2026' } },
+        { entity_type: 'cycles', action: 'CYCLE_CREATED', changed_by: changedBy, new_value: { year: 2026, phases: 'goal_setting, q1, q2, q3, q4', active: 'q2' } },
+        { entity_type: 'profiles', action: 'PROFILES_UPDATED', changed_by: changedBy, new_value: { departments: ['Product Engineering', 'People & Operations'], managers_assigned: true } },
       ];
-      await supabase.from('audit_logs').insert(auditEntries);
-
-      if (seededCount > 0) {
-        toast.success(`Seeded ${seededCount} employees with 6 goals each, achievements across all 4 quarters, and 5 cycles!`);
-      } else {
-        toast.success('Demo data already exists — no duplicates created.');
+      const now = new Date();
+      const d = (days: number) => new Date(now.getTime() - days * 86400000).toISOString();
+      const demoNotifications = [
+        { user_id: employeeProfile.id, type: 'goal_approved', title: 'Goals Approved', message: 'Your manager has approved your goal sheet for Q2 2026.', is_read: true, action_url: '/employee/goals', created_at: d(25) },
+        { user_id: employeeProfile.id, type: 'checkin_reminder', title: 'Q2 Check-In Reminder', message: 'Please log your Q2 progress for all goals before the end of the quarter.', is_read: false, action_url: '/employee/checkin', created_at: d(3) },
+        { user_id: employeeProfile.id, type: 'system', title: 'Welcome to AtomQuest', message: 'Your performance management portal is ready. Start by reviewing your goals.', is_read: true, action_url: '/employee', created_at: d(30) },
+        { user_id: managerProfile.id, type: 'goal_submitted', title: 'Goal Sheet Submitted', message: 'Priya Sharma has submitted their goal sheet for approval.', is_read: true, action_url: '/manager/team', created_at: d(26) },
+        { user_id: managerProfile.id, type: 'checkin_reminder', title: 'Team Check-In Review', message: 'Your team has pending Q2 check-ins waiting for your review.', is_read: false, action_url: '/manager/reviews', created_at: d(2) },
+        { user_id: managerProfile.id, type: 'system', title: 'Goal Sheet Pending', message: 'Your goal sheet for Q2 2026 has been submitted and is awaiting approval.', is_read: true, action_url: '/manager/goals', created_at: d(24) },
+      ];
+      if (adminProfile) {
+        demoNotifications.push(
+          { user_id: adminProfile.id, type: 'system', title: 'Demo Data Seeded', message: `${seededCount} employee(s) seeded with goals and achievements.`, is_read: false, action_url: '/admin', created_at: now.toISOString() },
+          { user_id: adminProfile.id, type: 'system', title: 'Q2 Cycle Active', message: 'The Q2 2026 cycle is now active. Manager sheet is pending approval for escalation demo.', is_read: true, action_url: '/admin/analytics', created_at: d(20) },
+        );
       }
+      await Promise.all([
+        supabase.from('audit_logs').insert(auditEntries),
+        supabase.from('notifications').insert(demoNotifications),
+      ]);
+      toast.success(`Seeded ${seededCount} employee(s) with goals, achievements, and ${demoNotifications.length} notifications!`);
       fetchCycles();
     } catch (err: any) {
       console.error(err);
@@ -310,8 +389,8 @@ function CycleManagement() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Create New Cycle</h2>
-      <form onSubmit={handleCreate} style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 28, alignItems: 'flex-end' }}>
+      <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>{editingId ? 'Edit Cycle' : 'Create New Cycle'}</h2>
+      <form onSubmit={handleSubmit} className="cycle-form-grid">
         <div>
           <label className="form-label">Year</label>
           <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="form-input" required />
@@ -334,10 +413,15 @@ function CycleManagement() {
           <label className="form-label">Closes At</label>
           <input type="date" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} className="form-input" required />
         </div>
-        <div>
-          <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ width: '100%' }}>
-            {isSubmitting ? 'Creating…' : 'Create Cycle'}
+        <div className="mobile-stack-buttons">
+          <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ width: editingId ? 'auto' : '100%', flex: 1 }}>
+            {isSubmitting ? (editingId ? 'Updating…' : 'Creating…') : (editingId ? 'Update Cycle' : 'Create Cycle')}
           </button>
+          {editingId && (
+            <button type="button" onClick={handleCancelEdit} className="btn btn-secondary" style={{ flex: 1 }}>
+              Cancel
+            </button>
+          )}
         </div>
       </form>
 
@@ -375,13 +459,25 @@ function CycleManagement() {
                       {cycle.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right', display: 'flex', gap: 12, justifyContent: 'flex-end', alignItems: 'center', height: '100%', minHeight: 40 }}>
                     <button
                       onClick={() => handleToggleActive(cycle.id, cycle.is_active)}
                       disabled={cycle.is_active}
                       style={{ fontSize: 12, fontWeight: 500, color: cycle.is_active ? 'var(--text-muted)' : 'var(--brand-yellow-dark)', background: 'none', border: 'none', cursor: cycle.is_active ? 'default' : 'pointer' }}
                     >
                       Set Active
+                    </button>
+                    <button
+                      onClick={() => handleEdit(cycle)}
+                      style={{ fontSize: 12, fontWeight: 500, color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(cycle.id)}
+                      style={{ fontSize: 12, fontWeight: 500, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >
+                      Delete
                     </button>
                   </td>
                 </tr>
@@ -397,32 +493,18 @@ function CycleManagement() {
 // ─── Goal Unlock ─────────────────────────────────────────────────────────────
 
 function GoalUnlock({ user }: { user: any }) {
-  const [sheets, setSheets] = useState<any[]>([]);
+  const { data: sheetsData = [] } = useApprovedSheets();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [reason, setReason] = useState('');
   const [selectedSheet, setSelectedSheet] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const searchSheets = async () => {
-    const { data, error } = await supabase
-      .from('goal_sheets')
-      .select('*, profiles!goal_sheets_employee_id_fkey(full_name)')
-      .eq('status', 'approved');
+  const searchSheets = () => queryClient.invalidateQueries({ queryKey: ['approvedSheets'] });
 
-    if (error) { console.error(error); return; }
-
-    let filtered = (data as any[]) || [];
-    if (searchTerm) {
-      filtered = filtered.filter((s) =>
-        s.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    setSheets(filtered);
-  };
-
-  useEffect(() => {
-    searchSheets();
-  }, [searchTerm]);
+  const sheets = searchTerm
+    ? sheetsData.filter((s: any) => s.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+    : sheetsData;
 
   const handleUnlock = async (sheetId: string) => {
     if (!reason.trim()) {
@@ -444,6 +526,19 @@ function GoalUnlock({ user }: { user: any }) {
         old_value: { status: 'approved' },
         new_value: { status: 'draft', reason },
       });
+
+      // Find the employee ID for this sheet to notify them
+      const sheet = sheetsData.find((s: any) => s.id === sheetId);
+      if (sheet && sheet.employee_id) {
+        await notificationService.createNotification({
+          user_id: sheet.employee_id,
+          type: 'system',
+          title: 'Goal Sheet Unlocked',
+          message: `Your manager or admin has unlocked your goal sheet for rework. Reason: ${reason}`,
+          action_url: '/employee/goals'
+        });
+      }
+
       setReason('');
       setSelectedSheet(null);
       searchSheets();
@@ -502,7 +597,7 @@ function GoalUnlock({ user }: { user: any }) {
 // ─── Shared Goals ─────────────────────────────────────────────────────────────
 
 function SharedGoals() {
-  const [employees, setEmployees] = useState<Profile[]>([]);
+  const { data: employees = [] } = useEmployees();
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
 
   const [title, setTitle] = useState('');
@@ -512,17 +607,6 @@ function SharedGoals() {
   const [target, setTarget] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('role', ['employee', 'manager']);
-      if (data) setEmployees(data);
-    };
-    fetchEmployees();
-  }, []);
 
   const handleToggleEmployee = (id: string) => {
     setSelectedEmployees((prev) =>
@@ -550,7 +634,6 @@ function SharedGoals() {
         target_date: uomType === 'timeline' ? target : null,
         status: 'not_started',
         is_shared: true,
-        weightage: 0,
       })
       .select()
       .single();
@@ -576,12 +659,13 @@ function SharedGoals() {
     const promises = selectedEmployees.map(async (empId) => {
       let { data: sheet } = await supabase
         .from('goal_sheets')
-        .select('id')
+        .select('id, status')
         .eq('employee_id', empId)
         .eq('cycle_id', activeCycle.id)
         .maybeSingle();
 
       let sheetId = sheet?.id;
+      let sheetStatus = sheet?.status;
 
       if (!sheetId) {
         const { data: newSheet } = await supabase
@@ -590,6 +674,8 @@ function SharedGoals() {
           .select()
           .single();
         sheetId = newSheet?.id;
+      } else if (sheetStatus === 'submitted' || sheetStatus === 'approved') {
+        await supabase.from('goal_sheets').update({ status: 'draft', manager_comment: 'Sheet unlocked due to new shared goal assignment. Please adjust weightages and resubmit.' }).eq('id', sheetId);
       }
 
       if (sheetId) {
@@ -602,8 +688,8 @@ function SharedGoals() {
           target_value: uomType !== 'timeline' ? Number(target) : null,
           target_date: uomType === 'timeline' ? target : null,
           status: 'not_started',
+          is_shared: true,
           shared_from: masterGoal.id,
-          weightage: 0,
         });
       }
     });
@@ -620,7 +706,7 @@ function SharedGoals() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+    <div className="shared-goals-grid">
       <div>
         <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 14 }}>Create Shared Goal</h2>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -636,7 +722,7 @@ function SharedGoals() {
             <label className="form-label">Description</label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="form-textarea" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="profile-form-grid">
             <div>
               <label className="form-label">UoM Type</label>
               <select value={uomType} onChange={(e) => setUomType(e.target.value)} className="form-select">
@@ -681,123 +767,131 @@ function SharedGoals() {
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 
 function AuditLogViewer() {
-  const [logs, setLogs] = useState<any[]>([]);
   const [entityFilter, setEntityFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [loading, setLoading] = useState(true);
+  const { data: logs = [], isLoading: loading } = useAuditLogs(entityFilter, startDate, endDate);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchLogs();
-  }, [entityFilter, startDate, endDate]);
+  const handleExport = () => {
+    const ws = XLSX.utils.json_to_sheet(logs.map(log => ({
+      'Time': new Date(log.changed_at || log.created_at).toLocaleString(),
+      'Actor': log.profiles?.full_name || log.changed_by,
+      'Action': log.action,
+      'Entity': log.entity_type,
+      'Entity ID': log.entity_id || '',
+      'Changes': JSON.stringify(log.new_value || log.details || {})
+    })));
 
-  const fetchLogs = async () => {
-    setLoading(true);
-    let query = supabase
-      .from('audit_logs')
-      .select('*, profiles!audit_logs_changed_by_fkey(full_name)')
-      .order('changed_at', { ascending: false })
-      .limit(100);
+    ws['!cols'] = [
+      { wch: 20 }, // Time
+      { wch: 20 }, // Actor
+      { wch: 20 }, // Action
+      { wch: 15 }, // Entity
+      { wch: 30 }, // Entity ID
+      { wch: 50 }, // Changes
+    ];
 
-    if (entityFilter) query = query.eq('entity_type', entityFilter);
-    if (startDate) query = query.gte('changed_at', new Date(startDate).toISOString());
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      query = query.lte('changed_at', end.toISOString());
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      console.error('Audit log fetch error:', error);
-      toast.error('Audit log fetch error: ' + error.message);
-    }
-    if (data) setLogs(data);
-    setLoading(false);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Audit Log');
+    XLSX.writeFile(wb, 'audit_log.xlsx');
+    toast.success('Audit log exported successfully');
   };
 
   return (
-    <div>
-      <div className="mb-4 flex flex-col md:flex-row gap-4">
+    <div className="card">
+      <div className="card-header" style={{ flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <label className="block text-xs font-medium text-gray-700">Entity Type</label>
-          <select
-            value={entityFilter}
-            onChange={(e) => setEntityFilter(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          >
-            <option value="">All Entities</option>
-            <option value="goal_sheet">Goal Sheet</option>
-            <option value="goals">Goals</option>
-            <option value="cycles">Cycles</option>
-          </select>
+          <div className="card-title">Audit Log</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{logs.length} record{logs.length !== 1 ? 's' : ''}</div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700">Start Date</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700">End Date</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          />
+
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div>
+            <label className="form-label" style={{ marginBottom: 4, fontSize: 11 }}>Entity Type</label>
+            <select
+              value={entityFilter}
+              onChange={(e) => setEntityFilter(e.target.value)}
+              className="form-select"
+              style={{ padding: '6px 10px', height: 34, minWidth: 140 }}
+            >
+              <option value="">All Entities</option>
+              <option value="goal_sheet">Goal Sheet</option>
+              <option value="goals">Goals</option>
+              <option value="cycles">Cycles</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label" style={{ marginBottom: 4, fontSize: 11 }}>Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="form-input"
+              style={{ padding: '6px 10px', height: 34 }}
+            />
+          </div>
+          <div>
+            <label className="form-label" style={{ marginBottom: 4, fontSize: 11 }}>End Date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="form-input"
+              style={{ padding: '6px 10px', height: 34 }}
+            />
+          </div>
+          <button onClick={handleExport} disabled={logs.length === 0} className="btn btn-success" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34 }}>
+            <Download size={14} /> Export to Excel
+          </button>
         </div>
       </div>
 
       {loading ? (
         <div className="py-8"><Spinner /></div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actor</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changes</th>
+                <th>Time</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Changes</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {logs.map((log) => (
                 <tr key={log.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
                     {new Date(log.changed_at || '').toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td style={{ fontWeight: 600, color: 'var(--text)' }}>
                     {log.profiles?.full_name || log.changed_by || 'System'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td style={{ fontWeight: 500 }}>
                     {log.action}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {log.entity_type} {log.entity_id ? `(${log.entity_id.slice(0, 8)}...)` : ''}
+                  <td style={{ color: 'var(--text-secondary)' }}>
+                    {log.entity_type} {log.entity_id ? <span style={{ fontSize: 11, fontFamily: 'monospace' }}>({log.entity_id.slice(0, 8)}...)</span> : ''}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
-                    <div className="text-xs space-y-1">
+                  <td style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 400 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {log.old_value && (
-                        <div><span className="font-medium text-gray-600">Old:</span> {JSON.stringify(log.old_value)}</div>
+                        <div><strong style={{ color: 'var(--text)' }}>Old:</strong> {JSON.stringify(log.old_value)}</div>
                       )}
                       {log.new_value && (
-                        <div><span className="font-medium text-gray-600">New:</span> {JSON.stringify(log.new_value)}</div>
+                        <div><strong style={{ color: 'var(--text)' }}>New:</strong> {JSON.stringify(log.new_value)}</div>
                       )}
-                      {!log.old_value && !log.new_value && <span className="italic text-gray-400">—</span>}
+                      {!log.old_value && !log.new_value && <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>—</span>}
                     </div>
                   </td>
                 </tr>
               ))}
               {logs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={5} style={{ padding: '48px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     No logs found.
                   </td>
                 </tr>

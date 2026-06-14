@@ -1,19 +1,8 @@
-import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import type { Cycle } from '../../types';
+import { useManagerStats } from '../../hooks/queries';
 import { Users, CheckCircle2, Clock, ArrowRight, AlertCircle, ClipboardCheck } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
-
-interface ManagerStats {
-  activeCycle: Cycle | null;
-  teamSize: number;
-  pendingApprovals: number;
-  approvedSheets: number;
-  checkInsCompleted: number;
-  checkInsPending: number;
-}
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -22,36 +11,7 @@ const greeting = () => {
 
 export function ManagerHome() {
   const { user, profile } = useAuth();
-  const [stats, setStats] = useState<ManagerStats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { if (user) loadStats(); }, [user?.id]);
-
-  async function loadStats() {
-    try {
-      setLoading(true);
-      const { data: cycle } = await supabase.from('cycles').select('*').eq('is_active', true).maybeSingle();
-      const { data: team } = await supabase.from('profiles').select('id').eq('manager_id', user!.id);
-      const teamIds = team?.map(t => t.id) || [];
-      let pendingApprovals = 0, approvedSheets = 0, checkInsCompleted = 0, checkInsPending = 0;
-
-      if (cycle && teamIds.length > 0) {
-        const { count: pc } = await supabase.from('goal_sheets').select('id', { count: 'exact', head: true }).eq('status', 'submitted').in('employee_id', teamIds);
-        pendingApprovals = pc || 0;
-        const { data: appr } = await supabase.from('goal_sheets').select('id').eq('status', 'approved').eq('cycle_id', cycle.id).in('employee_id', teamIds);
-        approvedSheets = appr?.length || 0;
-        if (appr && appr.length > 0) {
-          const { data: goals } = await supabase.from('goals').select('id').in('sheet_id', appr.map(s => s.id));
-          if (goals && goals.length > 0) {
-            const { data: ach } = await supabase.from('achievements').select('id,status').eq('cycle_phase', cycle.phase).in('goal_id', goals.map(g => g.id));
-            checkInsCompleted = ach?.filter(a => a.status === 'completed' || a.status === 'on_track').length || 0;
-            checkInsPending = Math.max(0, goals.length - checkInsCompleted);
-          }
-        }
-      }
-      setStats({ activeCycle: cycle, teamSize: teamIds.length, pendingApprovals, approvedSheets, checkInsCompleted, checkInsPending });
-    } catch (err) { console.error(err); } finally { setLoading(false); }
-  }
+  const { data: stats, isLoading: loading } = useManagerStats(user?.id);
 
   if (loading) return <div style={{ padding: 32 }}><Spinner /></div>;
 

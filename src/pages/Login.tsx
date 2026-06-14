@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import atombergLogo from '../assets/atomberg.png';
+import atombergFullLogo from '../assets/atombergFull.png';
 import '../index.css';
 
 export function Login() {
@@ -42,14 +44,12 @@ export function Login() {
       {/* Left Decorative Panel */}
       <div className="login-left">
         <div style={{ marginBottom: 48 }}>
-          <div style={{
-            width: 40, height: 40,
-            background: 'var(--brand-yellow)',
-            borderRadius: 4,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: 24,
-          }}>
-            <span style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>AQ</span>
+          <div style={{ marginBottom: 24 }}>
+            <img
+              src={atombergLogo}
+              alt="Atomberg"
+              style={{ height: 36, borderRadius: 6, display: 'block' }}
+            />
           </div>
           <div style={{ fontSize: 22, fontWeight: 700, color: '#fff', letterSpacing: -0.3, marginBottom: 6 }}>
             AtomQuest
@@ -68,11 +68,11 @@ export function Login() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="demo-accounts-list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
             { role: 'Employee', email: 'employee@test.com', pw: 'employee' },
-            { role: 'Manager',  email: 'manager@test.com',  pw: 'manager'  },
-            { role: 'Admin',    email: 'admin@test.com',    pw: 'admin'    },
+            { role: 'Manager', email: 'manager@test.com', pw: 'manager' },
+            { role: 'Admin', email: 'admin@test.com', pw: 'admin' },
           ].map(acc => (
             <button
               key={acc.role}
@@ -110,8 +110,12 @@ export function Login() {
       {/* Right Form Panel */}
       <div className="login-right">
         <div className="login-card">
-          <div className="login-logo">
-            <span style={{ fontSize: 16, fontWeight: 800, color: '#111827' }}>AQ</span>
+          <div className="login-logo" style={{ marginLeft: -45 }}>
+            <img
+              src={atombergFullLogo}
+              alt="Atomberg"
+              style={{ height: 64, width: 'auto', display: 'block' }}
+            />
           </div>
           <h1 className="login-title">Welcome back</h1>
           <p className="login-subtitle">Sign in to your AtomQuest account</p>

@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { EmployeeDashboard } from './pages/employee';
 import { ManagerDashboard } from './pages/manager';
 import { AdminDashboard } from './pages/admin';
+import { Notifications } from './pages/Notifications';
 import { ToastProvider } from './components/Toast';
 import './index.css';
 
@@ -21,6 +22,7 @@ function App() {
           <Route path="/employee/*" element={<EmployeeDashboard />} />
           <Route path="/manager/*" element={<ManagerDashboard />} />
           <Route path="/admin/*" element={<AdminDashboard />} />
+          <Route path="/notifications" element={<Notifications />} />
         </Route>
         
         {/* Fallback route */}

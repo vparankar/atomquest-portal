@@ -1,49 +1,6 @@
 # AtomQuest Architecture Diagram
 
-```mermaid
----
-config:
-  layout: elk
----
-graph TB
-    Employee[Employee]
-    Manager[Manager]
-    Admin[Admin]
-    
-    Employee -->|HTTPS| Frontend
-    Manager -->|HTTPS| Frontend
-    Admin -->|HTTPS| Frontend
-    
-    Frontend[React + Vite SPA]
-    CDN[Vercel CDN]
-    
-    Frontend -->|via| CDN
-    CDN -->|Global Edge| Browser[Browser Cache]
-    
-    Frontend -->|REST API| SupabaseAPI[Supabase REST API]
-    Frontend -->|WebSocket| SupabaseRT[Supabase Realtime]
-    
-    SupabaseAPI -->|HTTPS| PostgreSQL[(PostgreSQL Database<br/>7 Tables + RLS)]
-    SupabaseRT -->|Live Updates| PostgreSQL
-    
-    SupabaseAuth[Supabase Auth<br/>JWT Sessions]
-    SupabaseEdge[Edge Functions<br/>Escalation Rules]
-    
-    SupabaseAuth -.->|JWT Tokens| Frontend
-    SupabaseEdge -->|Triggers| PostgreSQL
-    
-    classDef userRole stroke:#818cf8,fill:#eef2ff
-    classDef frontend stroke:#2dd4bf,fill:#f0fdfa
-    classDef backend stroke:#a78bfa,fill:#f5f3ff
-    classDef database stroke:#fb923c,fill:#fff7ed
-    classDef security stroke:#f87171,fill:#fef2f2
-    
-    class Employee,Manager,Admin userRole
-    class Frontend,CDN,Browser frontend
-    class SupabaseAPI,SupabaseRT,SupabaseEdge backend
-    class PostgreSQL database
-    class SupabaseAuth security
-```
+![Architecture Diagram](./architecture-diagram.png)
 
 ## Technology Choices & Rationale
 - **React 19 + Vite**: Chosen for fast development, HMR, and optimal bundle sizes.

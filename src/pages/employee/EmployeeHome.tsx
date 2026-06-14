@@ -1,20 +1,8 @@
-import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import type { Cycle } from '../../types';
+import { useEmployeeStats } from '../../hooks/queries';
 import { FileText, CheckCircle2, AlertCircle, ArrowRight, Target, TrendingUp } from 'lucide-react';
 import { Spinner } from '../../components/Spinner';
-
-interface DashboardStats {
-  activeCycle: Cycle | null;
-  sheetStatus: string | null;
-  totalGoals: number;
-  completedGoals: number;
-  onTrackGoals: number;
-  latestScore: number | null;
-}
-
 const greeting = () => {
   const h = new Date().getHours();
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
@@ -29,31 +17,7 @@ const statusClass: Record<string, string> = {
 
 export function EmployeeHome() {
   const { user, profile } = useAuth();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { if (user) loadStats(); }, [user?.id]);
-
-  async function loadStats() {
-    try {
-      setLoading(true);
-      const { data: cycle } = await supabase.from('cycles').select('*').eq('is_active', true).maybeSingle();
-      if (!cycle) { setStats({ activeCycle: null, sheetStatus: null, totalGoals: 0, completedGoals: 0, onTrackGoals: 0, latestScore: null }); return; }
-      const { data: sheet } = await supabase.from('goal_sheets').select('id,status').eq('employee_id', user!.id).eq('cycle_id', cycle.id).maybeSingle();
-      let totalGoals = 0, completedGoals = 0, onTrackGoals = 0, latestScore: number | null = null;
-      if (sheet) {
-        const { data: goals } = await supabase.from('goals').select('id,status').eq('sheet_id', sheet.id);
-        totalGoals = goals?.length || 0;
-        completedGoals = goals?.filter(g => g.status === 'completed').length || 0;
-        onTrackGoals = goals?.filter(g => g.status === 'on_track').length || 0;
-        if (goals && goals.length > 0) {
-          const { data: ach } = await supabase.from('achievements').select('score').in('goal_id', goals.map(g => g.id)).eq('cycle_phase', cycle.phase);
-          if (ach && ach.length > 0) latestScore = Math.round(ach.reduce((s, a) => s + (a.score || 0), 0) / ach.length);
-        }
-      }
-      setStats({ activeCycle: cycle, sheetStatus: sheet?.status || null, totalGoals, completedGoals, onTrackGoals, latestScore });
-    } catch (err) { console.error(err); } finally { setLoading(false); }
-  }
+  const { data: stats, isLoading: loading } = useEmployeeStats(user?.id);
 
   if (loading) return <div style={{ padding: 32 }}><Spinner /></div>;
 
